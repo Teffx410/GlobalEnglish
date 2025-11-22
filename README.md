@@ -15,7 +15,7 @@ git clone https://github.com/Teffx410/GlobalEnglish
 cd GlobalEnglish
 
 
-2️⃣ Instalar dependencias
+#2️⃣ Instalar dependencias
 ✔ Instalar Docker Desktop
 
 https://www.docker.com/products/docker-desktop/
@@ -25,7 +25,7 @@ https://www.docker.com/products/docker-desktop/
 Oracle SQL Developer Extension for VSCode
 (Aparece en el Marketplace)
 
-3️⃣ Crear la base de datos Oracle XE en Docker
+#3️⃣ Crear la base de datos Oracle XE en Docker
 
 Ejecutar en CMD o PowerShell:
 
@@ -39,7 +39,7 @@ docker run -d ^
 
 ⚠ Nota: La descarga de la imagen puede tardar bastante.
 
-4️⃣ Verificar que Oracle está listo
+#4️⃣ Verificar que Oracle está listo
 
 Ejecutar:
 
@@ -53,7 +53,7 @@ DATABASE IS READY TO USE!
 
 entonces todo está correcto.
 
-5️⃣ Crear conexión en VSCode (como SYSTEM)
+#5️⃣ Crear conexión en VSCode (como SYSTEM)
 
 Abrir el panel de conexiones (Oracle Developer en VSCode) y crear una conexión con:
 
@@ -67,7 +67,7 @@ Connection Type	Basic
 
 Conectarse para continuar.
 
-6️⃣ Crear el usuario del proyecto
+#6️⃣ Crear el usuario del proyecto
 
 Ejecutar en VSCode conectado como SYSTEM:
 
@@ -82,7 +82,7 @@ Usuario: GLOBALENGLISH
 
 Contraseña: oracle
 
-7️⃣ Crear conexión como GLOBALENGLISH
+#7️⃣ Crear conexión como GLOBALENGLISH
 
 Hacer una nueva conexión en VSCode:
 
@@ -95,7 +95,7 @@ Service Name	XEPDB1
 
 A partir de aquí, no se usa SYSTEM nunca más.
 
-8️⃣ Generar todas las tablas automáticamente
+#8️⃣ Generar todas las tablas automáticamente
 
 En el repositorio existe el archivo:
 
@@ -121,7 +121,7 @@ python create_schema.py
 
 Si todo va bien, aparecerán mensajes indicando que las tablas fueron creadas correctamente.
 
-9️⃣ ¡Listo! 🎉
+#9️⃣ ¡Listo! 🎉
 
 Ahora ya todos tienen:
 
