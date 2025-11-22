@@ -15,7 +15,7 @@ git clone https://github.com/Teffx410/GlobalEnglish
 cd GlobalEnglish
 
 
-#2️⃣ Instalar dependencias
+# 2️⃣ Instalar dependencias
 ✔ Instalar Docker Desktop
 
 https://www.docker.com/products/docker-desktop/
