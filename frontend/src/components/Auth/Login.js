@@ -16,7 +16,6 @@ function Login({ setToken }) {
     e.preventDefault();
     setError('');
     try {
-      // Envía solo correo y contrasena como requiere el backend
       const resp = await axios.post("http://localhost:8000/login", {
         correo: form.correo,
         contrasena: form.contrasena
@@ -26,26 +25,27 @@ function Login({ setToken }) {
 
       console.log("RESPUESTA DEL BACKEND:", resp.data);
 
-      // ☑️ Usar ftoken y rol, como responde el backend
-      if (resp.data.ftoken && resp.data.rol) {
+      // Guarda token, rol, y nombre_user dinámicamente
+      if (resp.data.ftoken && resp.data.rol && resp.data.nombre_user) {
         setToken(resp.data.ftoken);
         localStorage.setItem("token", resp.data.ftoken);
         localStorage.setItem("rol", resp.data.rol);
+        localStorage.setItem("nombre_user", resp.data.nombre_user);
 
-        // Redirige automático según el rol
         switch (resp.data.rol) {
-          case "ADMINISTRADOR":
-            navigate("/admin-dashboard");
+        case "ADMINISTRADOR":
+            navigate("/admin/dashboard");      // Cambia a layout anidado
             break;
-          case "ADMINISTRATIVO":
+        case "ADMINISTRATIVO":
             navigate("/operativo-dashboard");
             break;
-          case "TUTOR":
+        case "TUTOR":
             navigate("/tutor-dashboard");
             break;
-          default:
+        default:
             navigate("/dashboard");
         }
+
       } else {
         setError("Credenciales incorrectas.");
       }
@@ -110,5 +110,4 @@ function Login({ setToken }) {
     </div>
   );
 }
-
 export default Login;

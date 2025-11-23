@@ -13,9 +13,12 @@ class InstitucionOut(InstitucionIn):
 
 class SedeIn(BaseModel):
     id_institucion: int
-    id_sede: int
     direccion: Optional[str] = None
     es_principal: Optional[str] = 'N'
+
+class SedeOut(SedeIn):
+    id_sede: int
+
 
 class PersonaIn(BaseModel):
     tipo_doc: Optional[str]

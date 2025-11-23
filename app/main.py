@@ -1,6 +1,6 @@
 # app/main.py
 from fastapi import FastAPI, HTTPException, Depends
-from app.models import InstitucionIn, InstitucionOut, PersonaIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut
+from app.models import InstitucionIn, InstitucionOut, PersonaIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut, SedeIn, SedeOut
 import app.crud as crud
 import app.reports as reports
 from app.auth import create_token, require_role
@@ -36,6 +36,50 @@ def get_institucion(id_inst: int):
         raise HTTPException(status_code=404, detail="No encontrada")
     return inst
 
+@app.delete("/instituciones/{id_inst}")
+def delete_institucion(id_inst: int):
+    crud.delete_institucion(id_inst)
+    return {"ok": True}
+
+@app.put("/instituciones/{id_inst}", response_model=InstitucionOut)
+def update_institucion(id_inst: int, payload: InstitucionIn):
+    crud.update_institucion(id_inst, payload.dict())
+    inst = crud.get_institucion(id_inst)
+    if not inst:
+        raise HTTPException(status_code=404, detail="No encontrada")
+    return inst
+
+@app.post("/sedes", response_model=SedeOut)
+def create_sede(payload: SedeIn):
+    id_sede = crud.create_sede(payload.dict())
+    if not id_sede:
+        raise HTTPException(status_code=400, detail="No se pudo crear sede")
+    out = crud.get_sede(id_sede)
+    return out
+
+@app.get("/sedes")
+def list_sedes():
+    return crud.list_sedes()
+
+@app.get("/sedes/{id_sede}")
+def get_sede(id_sede: int):
+    sede = crud.get_sede(id_sede)
+    if not sede:
+        raise HTTPException(status_code=404, detail="No encontrada")
+    return sede
+
+@app.delete("/sedes/{id_sede}")
+def delete_sede(id_sede: int):
+    crud.delete_sede(id_sede)
+    return {"ok": True}
+
+@app.put("/sedes/{id_sede}", response_model=SedeOut)
+def update_sede(id_sede: int, payload: SedeIn):
+    crud.update_sede(id_sede, payload.dict())
+    sede = crud.get_sede(id_sede)
+    if not sede:
+        raise HTTPException(status_code=404, detail="No encontrada")
+    return sede
 # Personas (ejemplo)
 @app.post("/personas", response_model=PersonaOut)
 def create_persona(payload: PersonaIn):
@@ -117,7 +161,8 @@ def login(payload: LoginIn):
         if db_pass != payload.contrasena:
             raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
         token = create_token({"correo": payload.correo, "rol": rol, "nombre_user": nombre_user})
-        
+        print("Rol encontrado en base:", rol)
+
         # 🚩 Devuelve token, rol y nombre_user (opcional para el frontend)
         return {
             "ftoken": token,       # puedes cambiar a "token" si prefieres, igual que antes
