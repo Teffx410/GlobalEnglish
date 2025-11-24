@@ -3,15 +3,32 @@
 .admin-sidebar {
   background: #222e3c;
   width: 260px;
-  min-height: 100vh;
+  height: 100vh;           /* altura total ventana */
+  overflow-y: auto;        /* barra desplazadora vertical si hay contenido extra */
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   color: #e6eaff;
   box-shadow: 0px 2px 14px 0 #191d23eb;
   position: fixed;
-  left: 0; top: 0;
+  left: 0;
+  top: 0;
   z-index: 110;
+}
+
+.sidebar-nav {
+  max-height: calc(100vh - 160px); /* deja espacio para header, usuario y botón logout */
+  overflow-y: auto;                /* scroll solo en navegación */
+}
+
+/* Opcional: estilo para scrollbar */
+.admin-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
 }
 
 .admin-dashboard-container {
@@ -301,33 +318,261 @@
   background: #f7f9fc;
   min-width: 90px;
 }
-/* Reutiliza los estilos de botones de instituciones */
-.btn-editar {
-  background: #e1edfe;
+
+.aulas-panel {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 3px 16px rgba(44,62,80,.08);
+  padding: 32px;
+  margin: 24px auto;
+  max-width: 1500px;
+}
+.aulas-form {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.aulas-form select, .aulas-form input {
+  flex: 1;
+  min-width: 160px;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: #f3f7fc;
+  font-size: 1em;
+  margin-right: 6px;
+}
+.aulas-btn {
+  background: #2563eb;
+  color: #fff;
+  font-weight: bold;
+  border-radius: 8px;
+  padding: 0 30px;
+  border: none;
+  font-size: 1.07em;
+  cursor: pointer;
+  margin-left: 12px;
+  height: 45px;
+}
+.aulas-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+.aulas-table th {
+  padding: 18px 14px;
+  text-align: left;
+  background: #f8fafe;
   color: #2563eb;
-  border: none;
-  border-radius: 7px;
-  font-weight: bold;
-  padding: 6px 18px;
-  margin-right: 5px;
-  cursor: pointer;
+  font-size: 1.10em;
 }
-.btn-eliminar {
-  background: #ffe2e2;
-  color: #c44e4e;
-  border: none;
-  border-radius: 7px;
-  font-weight: bold;
-  padding: 6px 18px;
-  cursor: pointer;
+.aulas-table td {
+  padding: 15px 14px;
+  border-bottom: 1px solid #f2f2f2;
+  font-size: 1em;
 }
-.btn-cancelar {
-  background: #cccccc;
-  color: #222e3c;
-  border: none;
-  border-radius: 7px;
+
+.aulas-form-input {
+  flex: 1;
+  min-width: 140px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e6eaff;
+  background: #f3f7fc;
+  font-size: 1em;
+  outline: none;
+  margin-right: 7px;
+  box-sizing: border-box;
+  transition: border-color .18s;
+}
+
+.aulas-form-input:focus {
+  border: 1.5px solid #2563eb;
+  background: #f7fbff;
+}
+
+.aulas-form select,
+.aulas-table select,
+.aulas-table input {
+  /* Esto asegura que incluso los selects dentro de la tabla tengan el mismo look */
+  font-size: 1em;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f3f7fc;
+  border: 1px solid #e6eaff;
+  outline: none;
+  transition: border-color .18s;
+}
+
+.instituciones-form,
+.aulas-form {
+  display: flex;
+  flex-wrap: wrap;         /* Esto permite que los elementos se pasen a una nueva línea si no caben */
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.instituciones-form > *,
+.aulas-form > * {
+  min-width: 160px;
+  flex: 1 1 220px;         /* El campo puede crecer y ocupar espacio */
+  box-sizing: border-box;
+}
+
+.aulas-btn, .instituciones-btn {
+  flex: initial;
+  min-width: 170px;        /* Botón fijo para que no se reduzca demasiado */
+  max-width: 220px;
+}
+
+/* Calendario - react-big-calendar visual institucional moderno */
+
+.rbc-calendar, .rbc-header, .rbc-toolbar, .rbc-event, .rbc-timeslot-group, .rbc-label, .rbc-btn-group, .rbc-row-bg {
+  font-family: 'Roboto', Arial, sans-serif !important;
+  letter-spacing: 0.2px;
+}
+
+.rbc-calendar {
+  background: #fff !important;
+  border-radius: 22px !important;
+  box-shadow: 0 4px 32px #3269fb18 !important;
+  padding: 18px 10px !important;
+  border: none !important;
+}
+
+.rbc-header {
+  color: #246bf8 !important;
   font-weight: bold;
-  margin-left: 4px;
-  padding: 6px 18px;
-  cursor: pointer;
+  font-size: 1.13em;
+  background: #f9fbff !important;
+  border: none !important;
+  font-family: 'Roboto', Arial, sans-serif !important;
+}
+
+.rbc-label {
+  color: #26436c;
+  font-size: 1.08em;
+}
+
+.rbc-toolbar {
+  background: #f4f7fe !important;
+  border-radius: 14px !important;
+  color: #265dfc !important;
+  font-weight: 600 !important;
+  margin-bottom: 16px !important;
+  font-size: 1.13em !important;
+  border: none !important;
+  box-shadow: 0 1px 4px #265dfc09;
+  font-family: 'Roboto', Arial, sans-serif !important;
+}
+
+.rbc-btn-group button,
+.rbc-btn-group > button {
+  background: #e6edff !important;
+  color: #1d2980 !important;
+  border: none !important;
+  border-radius: 7px !important;
+  font-weight: bold;
+  margin-right: 4px;
+  font-size: 1.08em;
+  box-shadow: 0 1px 2px #2563eb10;
+  transition: background 0.11s;
+  font-family: 'Roboto', Arial, sans-serif !important;
+}
+
+.rbc-btn-group button:hover,
+.rbc-btn-group > button:hover {
+  background: #3269fb !important;
+  color: #fff !important;
+}
+
+.rbc-time-view, .rbc-timeslot-group, .rbc-day-slot, .rbc-time-header, .rbc-header {
+  border: none !important;
+  background: transparent !important;
+}
+
+.rbc-timeslot-group {
+  min-height: 96px !important;
+  height: 96px !important;
+}
+
+.rbc-event {
+  width: 98% !important;
+  left: 1% !important;
+  right: 1% !important;
+  border-radius: 18px !important;
+  font-size: 1.19em !important;
+  padding: 16px 18px !important;
+  box-shadow: 0 4px 18px #3269fb25 !important;
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-family: 'Roboto', Arial, sans-serif;
+  letter-spacing: 0.4px;
+}
+.rbc-event-content {
+  text-align: left !important;
+  font-weight: 700;
+  font-family: 'Roboto', Arial, sans-serif !important;
+  font-size: 1.19em;
+}
+.rbc-event:hover {
+  background: #274dff !important;
+  box-shadow: 0 2px 18px #1958a6;
+}
+
+.rbc-row-bg {
+  background: #f8fafe;
+}
+
+.rbc-event, .rbc-event-content {
+  font-size: 1.1em !important;    /* fuerza tamaño muy pequeño */
+  font-weight: 700 !important;
+  line-height: 1.5 !important;
+  padding: 1.9px 8px !important;
+}
+.rbc-event .rbc-event-content {
+  white-space: pre-line !important;
+}
+
+.rbc-btn-group {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.rbc-btn-group button, .rbc-btn-group > button {
+  background: #e6edff !important;
+  color: #1d2980 !important;
+  border: none !important;
+  border-radius: 7px !important;
+  font-weight: 700 !important;
+  margin-right: 4px !important;
+  font-size: 1.08em !important;
+  box-shadow: 0 1px 4px #2563eb10 !important;
+  min-width: 72px !important;
+  padding: 7px 0 !important;
+  transition: background 0.11s !important;
+  font-family: 'Roboto', Arial, sans-serif !important;
+  text-align: center !important;
+  cursor: pointer !important;
+}
+
+.rbc-btn-group button:active,
+.rbc-btn-group > button:active,
+.rbc-btn-group button:focus,
+.rbc-btn-group > button:focus {
+  background: #d2e3ff !important;
+  outline: none !important;
+}
+
+.rbc-btn-group button:hover,
+.rbc-btn-group > button:hover,
+.rbc-btn-group button.rbc-active,
+.rbc-btn-group > button.rbc-active {
+  background: #3269fb !important;
+  color: #fff !important;
 }
