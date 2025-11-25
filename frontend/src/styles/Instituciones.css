@@ -1,0 +1,74 @@
+/* src/components/Admin/Instituciones.css */
+.instituciones-panel {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 3px 16px rgba(44,62,80,.08);
+  padding: 32px;
+  margin: 20px;
+}
+.instituciones-form {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.instituciones-form input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: #f3f7fc;
+  font-size: 1em;
+}
+.instituciones-btn {
+  background: #2563eb;
+  color: #fff;
+  font-weight: bold;
+  border-radius: 8px;
+  padding: 0 28px;
+  border: none;
+  font-size: 1em;
+}
+.instituciones-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+.instituciones-table th {
+  padding: 18px 12px;
+  text-align: left;
+  background: #f8fafe;
+  color: #2563eb;
+  font-size: 1.07em;
+}
+.instituciones-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #f2f2f2;
+  font-size: 1em;
+}
+.estado-activo {
+  background: #e7fcef;
+  color: #34c47c;
+  padding: 6px 14px;
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 0.98em;
+}
+.btn-editar {
+  background: #e1edfe;
+  color: #2563eb;
+  border: none;
+  border-radius: 7px;
+  font-weight: bold;
+  padding: 6px 18px;
+  margin-right: 6px;
+  cursor: pointer;
+}
+.btn-eliminar {
+  background: #ffe2e2;
+  color: #c44e4e;
+  border: none;
+  border-radius: 7px;
+  font-weight: bold;
+  padding: 6px 18px;
+  cursor: pointer;
+}

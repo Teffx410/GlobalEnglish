@@ -1,12 +1,21 @@
 # app/main.py
 from fastapi import FastAPI, HTTPException, Depends
-from app.models import InstitucionIn, InstitucionOut, PersonaIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut
+from app.models import InstitucionIn, InstitucionOut, PersonaIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut, SedeIn, SedeOut
 import app.crud as crud
 import app.reports as reports
 from app.auth import create_token, require_role
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="GlobalEnglish API")
+app = FastAPI()
 
+# Permitir llamadas desde el frontend React (por defecto en localhost:3000)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Cambia el puerto si tu React usa otro
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Instituciones
 @app.post("/instituciones", response_model=InstitucionOut)
 def create_institucion(payload: InstitucionIn):
@@ -27,6 +36,50 @@ def get_institucion(id_inst: int):
         raise HTTPException(status_code=404, detail="No encontrada")
     return inst
 
+@app.delete("/instituciones/{id_inst}")
+def delete_institucion(id_inst: int):
+    crud.delete_institucion(id_inst)
+    return {"ok": True}
+
+@app.put("/instituciones/{id_inst}", response_model=InstitucionOut)
+def update_institucion(id_inst: int, payload: InstitucionIn):
+    crud.update_institucion(id_inst, payload.dict())
+    inst = crud.get_institucion(id_inst)
+    if not inst:
+        raise HTTPException(status_code=404, detail="No encontrada")
+    return inst
+
+@app.post("/sedes", response_model=SedeOut)
+def create_sede(payload: SedeIn):
+    id_sede = crud.create_sede(payload.dict())
+    if not id_sede:
+        raise HTTPException(status_code=400, detail="No se pudo crear sede")
+    out = crud.get_sede(id_sede)
+    return out
+
+@app.get("/sedes")
+def list_sedes():
+    return crud.list_sedes()
+
+@app.get("/sedes/{id_sede}")
+def get_sede(id_sede: int):
+    sede = crud.get_sede(id_sede)
+    if not sede:
+        raise HTTPException(status_code=404, detail="No encontrada")
+    return sede
+
+@app.delete("/sedes/{id_sede}")
+def delete_sede(id_sede: int):
+    crud.delete_sede(id_sede)
+    return {"ok": True}
+
+@app.put("/sedes/{id_sede}", response_model=SedeOut)
+def update_sede(id_sede: int, payload: SedeIn):
+    crud.update_sede(id_sede, payload.dict())
+    sede = crud.get_sede(id_sede)
+    if not sede:
+        raise HTTPException(status_code=404, detail="No encontrada")
+    return sede
 # Personas (ejemplo)
 @app.post("/personas", response_model=PersonaOut)
 def create_persona(payload: PersonaIn):
@@ -78,3 +131,76 @@ def create_estudiante(payload: EstudianteIn):
 @app.get("/reportes/aula/{id_aula}/asistencia")
 def reporte_aula(id_aula: int, id_semana: int = None):
     return reports.reporte_asistencia_aula(id_aula, id_semana)
+
+from pydantic import BaseModel
+
+class LoginIn(BaseModel):
+    correo: str
+    contrasena: str
+
+@app.post("/login")
+def login(payload: LoginIn):
+    print("****** LOGIN ENDPOINT CALLED ******")
+    print("LOGIN DATA:", payload)
+    try:
+        conn = crud.get_conn()
+        cur = conn.cursor()
+        print("Buscando correo:", repr(payload.correo))
+
+        cur.execute("""
+            SELECT u.contrasena, p.rol, u.nombre_user
+            FROM USUARIO u JOIN PERSONA p ON u.id_persona = p.id_persona
+            WHERE TRIM(LOWER(p.correo)) = TRIM(LOWER(:1))
+        """, (payload.correo.strip().lower(),))
+
+        result = cur.fetchone()
+        print("DB QUERY RESULT:", result)
+        if not result:
+            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+        db_pass, rol, nombre_user = result
+        if db_pass != payload.contrasena:
+            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+        token = create_token({"correo": payload.correo, "rol": rol, "nombre_user": nombre_user})
+        print("Rol encontrado en base:", rol)
+
+        # 🚩 Devuelve token, rol y nombre_user (opcional para el frontend)
+        return {
+            "ftoken": token,       # puedes cambiar a "token" si prefieres, igual que antes
+            "rol": rol,
+            "nombre_user": nombre_user
+        }
+    except Exception as e:
+        print("ERROR EN LOGIN:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except:
+            pass
+
+
+@app.get("/test-db-status")
+def test_db_status():
+    import app.db as dbmod
+    conn = dbmod.get_conn()
+    cur = conn.cursor()
+    info = {}
+
+    # Usuario conectado
+    cur.execute("SELECT USER FROM DUAL")
+    info["usuario_conectado"] = cur.fetchone()[0]
+
+    # Tablas accesibles
+    cur.execute("SELECT TABLE_NAME FROM USER_TABLES")
+    info["tablas_visibles"] = [row[0] for row in cur.fetchall()]
+
+    # Registros crudos en USUARIO
+    cur.execute("SELECT * FROM USUARIO")
+    usuarios = cur.fetchall()
+    info["registros_usuario"] = usuarios
+
+    cur.close()
+    conn.close()
+    return info
+
