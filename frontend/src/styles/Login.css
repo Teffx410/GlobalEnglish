@@ -19,15 +19,17 @@
 }
 
 .login-header {
-  display: flex;
-  flex-direction: column;
+  height: 200px;
+  display: block;
   align-items: center;
   margin-bottom: 24px;
 }
 
 .login-logo {
-  width: 48px;
-  margin-bottom: 8px;
+  width: 400px;
+  height: 400px;
+  display: block;
+  margin-top: -100px;
 }
 
 .login-card h2 {

@@ -2,7 +2,7 @@ import oracledb
 
 USER = "GLOBALENGLISH"
 PASSWORD = "oracle"
-DSN = "localhost:1521/XEPDB1"
+DSN = "localhost:1522/XEPDB1"
 
 conn = oracledb.connect(user=USER, password=PASSWORD, dsn=DSN)
 cur = conn.cursor()

@@ -26,7 +26,22 @@ function AsignarHorarioAula() {
         .then(r => setHistorial(r.data));
     }
   }
-
+  function finalizarHistorial(idHist) {
+  if (!window.confirm("¿Marcar este horario como finalizado?")) return;
+  axios
+    .put(`http://localhost:8000/historial-horarios-aula/${idHist}/fin`)
+    .then(() => {
+      setMsg("Horario marcado como finalizado");
+      if (form.id_aula) {
+        axios
+          .get(`http://localhost:8000/historial-horarios-aula/${form.id_aula}`)
+          .then((r) => setHistorial(r.data));
+      }
+    })
+    .catch((err) => {
+      setMsg(err.response?.data?.detail || "Error al finalizar horario");
+    });
+}
   function asignarHorario(e) {
     e.preventDefault();
     axios.post("http://localhost:8000/asignar-horario-aula", form)
@@ -77,10 +92,11 @@ function AsignarHorarioAula() {
               <th>Horario</th>
               <th>Min.</th>
               <th>Cont.</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {historial.map(h => (
+            {historial.map((h) => (
               <tr key={h.id_hist_horario}>
                 <td>{h.id_hist_horario}</td>
                 <td>{h.id_horario}</td>
@@ -90,10 +106,24 @@ function AsignarHorarioAula() {
                 <td>{h.h_inicio} - {h.h_final}</td>
                 <td>{h.minutos_equiv}</td>
                 <td>{h.es_continuo === "S" ? "Sí" : "No"}</td>
+                <td>
+                  {!h.fecha_fin && (
+                    <button
+                      className="btn-editar"
+                      type="button"
+                      onClick={() => finalizarHistorial(h.id_hist_horario)}
+                    >
+                      Finalizar
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
-            {historial.length === 0 &&
-              <tr><td colSpan={8}>No hay historial</td></tr>}
+            {historial.length === 0 && (
+              <tr>
+                <td colSpan={9}>No hay historial</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
