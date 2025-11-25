@@ -1,0 +1,7 @@
+0.Clonar Repositorio:https://github.com/Teffx410/GlobalEnglish
+1.Descarga Docker
+2.Descarga Oracle SQL Developer (Client)
+3.Ejecutar en CMD:
+docker run -d ^ --name oracle-xe ^ -e ORACLE_PASSWORD=oracle ^ -p 1521:1521 ^ -p 5500:5500 ^ gvenzl/oracle-xe 
+(Les aviso que esta descarga puede ser ETEERNAA)
+4.
