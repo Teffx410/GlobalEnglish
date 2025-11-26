@@ -471,7 +471,7 @@ def list_componentes():
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT id_componente, nombre, porcentaje
+            SELECT id_componente, nombre, porcentaje, id_periodo, tipo_programa
             FROM COMPONENTE
             ORDER BY id_componente
         """)
@@ -481,6 +481,8 @@ def list_componentes():
                 "id_componente": r[0],
                 "nombre": r[1],
                 "porcentaje": r[2],
+                "id_periodo": r[3],
+                "tipo_programa": r[4],
             }
             for r in rows
         ]
@@ -495,12 +497,14 @@ def create_componente(data: dict) -> int:
     try:
         id_var = cur.var(oracledb.NUMBER)
         cur.execute("""
-            INSERT INTO COMPONENTE(nombre, porcentaje)
-            VALUES (:nombre, :porcentaje)
+            INSERT INTO COMPONENTE(nombre, porcentaje, id_periodo, tipo_programa)
+            VALUES (:nombre, :porcentaje, :id_periodo, :tipo_programa)
             RETURNING id_componente INTO :idc
         """, {
             "nombre": data["nombre"],
             "porcentaje": data["porcentaje"],
+            "id_periodo": data["id_periodo"],
+            "tipo_programa": data.get("tipo_programa"),
             "idc": id_var
         })
         conn.commit()
@@ -903,55 +907,87 @@ def finalizar_historial_horario(id_hist_horario: int, fecha_fin: Optional[str] =
 
 def asignar_tutor_a_aula(data: dict):
     """
-    Cierra al tutor activo (si lo hay) de esa aula y crea un nuevo
-    registro en ASIGNACION_TUTOR.
+    Asigna un tutor (id_persona) a un aula (id_aula).
+
+    - Cierra la asignación anterior (si la hay) poniendo fecha_fin en ASIGNACION_TUTOR
+      para el id_tutor_aula que estaba en AULA.
+    - Crea un nuevo registro en ASIGNACION_TUTOR.
+    - Actualiza AULA.id_tutor_aula con el nuevo id_tutor_aula.
     """
     conn = get_conn()
     cur = conn.cursor()
     try:
         id_aula = data["id_aula"]
         id_persona = data["id_persona"]
-        fecha_inicio = data.get("fecha_inicio")  # "YYYY-MM-DD" o None
+        fecha_inicio = data.get("fecha_inicio")   # "YYYY-MM-DD" o None
         motivo_cambio = data.get("motivo_cambio")
 
-        # 1) Cerrar tutor previo activo de esa aula (fecha_fin IS NULL)
-        cur.execute("""
-            UPDATE ASIGNACION_TUTOR
-            SET fecha_fin = SYSDATE
-            WHERE id_aula = :1
-              AND fecha_fin IS NULL
-        """, (id_aula,))
+        # 1) Leer tutor actual del aula (si lo hay)
+        cur.execute("SELECT id_tutor_aula FROM AULA WHERE id_aula = :1", (id_aula,))
+        row = cur.fetchone()
+        tutor_actual = row[0] if row and row[0] is not None else None
 
-        # 2) Obtener siguiente ID_TUTOR_AULA
-        cur.execute("SELECT NVL(MAX(id_tutor_aula), 0) + 1 FROM ASIGNACION_TUTOR")
-        next_id = cur.fetchone()[0]
+        # 2) Si hay tutor actual, cerrar su asignación en ASIGNACION_TUTOR
+        if tutor_actual:
+            if fecha_inicio:
+                cur.execute("""
+                    UPDATE ASIGNACION_TUTOR
+                    SET fecha_fin = TO_DATE(:1, 'YYYY-MM-DD')
+                    WHERE id_tutor_aula = :2
+                      AND fecha_fin IS NULL
+                """, (fecha_inicio, tutor_actual))
+            else:
+                cur.execute("""
+                    UPDATE ASIGNACION_TUTOR
+                    SET fecha_fin = SYSDATE
+                    WHERE id_tutor_aula = :1
+                      AND fecha_fin IS NULL
+                """, (tutor_actual,))
 
-        # 3) Insertar nuevo registro
+        # 3) Crear nueva asignación en ASIGNACION_TUTOR
+        id_var = cur.var(oracledb.NUMBER)
         if fecha_inicio:
             cur.execute("""
                 INSERT INTO ASIGNACION_TUTOR(
-                    id_tutor_aula, id_persona, id_aula, fecha_inicio, fecha_fin, motivo_cambio
+                    id_persona, fecha_inicio, fecha_fin, motivo_cambio
                 )
-                VALUES (:1, :2, :3, TO_DATE(:4, 'YYYY-MM-DD'), NULL, :5)
-            """, (next_id, id_persona, id_aula, fecha_inicio, motivo_cambio))
+                VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), NULL, :3)
+                RETURNING id_tutor_aula INTO :4
+            """, (id_persona, fecha_inicio, motivo_cambio, id_var))
         else:
             cur.execute("""
                 INSERT INTO ASIGNACION_TUTOR(
-                    id_tutor_aula, id_persona, id_aula, fecha_inicio, fecha_fin, motivo_cambio
+                    id_persona, fecha_inicio, fecha_fin, motivo_cambio
                 )
-                VALUES (:1, :2, :3, SYSDATE, NULL, :4)
-            """, (next_id, id_persona, id_aula, motivo_cambio))
+                VALUES (:1, SYSDATE, NULL, :2)
+                RETURNING id_tutor_aula INTO :3
+            """, (id_persona, motivo_cambio, id_var))
+
+        new_id = id_var.getvalue()
+        if isinstance(new_id, list):
+            new_id = new_id[0]
+        new_id = int(new_id)
+
+        # 4) Actualizar AULA con el nuevo tutor
+        cur.execute("""
+            UPDATE AULA
+            SET id_tutor_aula = :1
+            WHERE id_aula = :2
+        """, (new_id, id_aula))
 
         conn.commit()
-        return next_id
+        return new_id
     finally:
         cur.close()
         conn.close()
 
 def get_historial_tutores_aula(id_aula: int, limit=200):
     """
-    Devuelve el historial de tutores de un aula,
-    uniendo ASIGNACION_TUTOR con PERSONA y AULA.
+    Devuelve el historial de tutores que han dictado clase en un aula,
+    usando ASISTENCIA_AULA + ASIGNACION_TUTOR + PERSONA + AULA.
+
+    Ojo: aquí el 'rango' de fechas viene de las fechas de clase (ASISTENCIA_AULA),
+    no de la fecha de inicio/fin de la asignación.
     """
     conn = get_conn()
     cur = conn.cursor()
@@ -959,21 +995,32 @@ def get_historial_tutores_aula(id_aula: int, limit=200):
         cur.execute("""
             SELECT
                 at.id_tutor_aula,
-                at.id_aula,
+                aa.id_aula,
                 at.id_persona,
-                TO_CHAR(at.fecha_inicio, 'YYYY-MM-DD') AS fecha_inicio,
-                TO_CHAR(at.fecha_fin, 'YYYY-MM-DD')   AS fecha_fin,
+                TO_CHAR(MIN(aa.fecha_clase), 'YYYY-MM-DD') AS fecha_inicio,
+                TO_CHAR(MAX(aa.fecha_clase), 'YYYY-MM-DD') AS fecha_fin,
                 at.motivo_cambio,
                 p.nombre,
                 p.correo,
                 a.id_institucion,
                 a.id_sede,
                 a.grado
-            FROM ASIGNACION_TUTOR at
-            JOIN PERSONA p ON at.id_persona = p.id_persona
-            JOIN AULA a    ON at.id_aula    = a.id_aula
-            WHERE at.id_aula = :1
-            ORDER BY at.fecha_inicio DESC, at.id_tutor_aula DESC
+            FROM ASISTENCIA_AULA aa
+            JOIN ASIGNACION_TUTOR at ON aa.id_tutor_aula = at.id_tutor_aula
+            JOIN PERSONA p           ON at.id_persona    = p.id_persona
+            JOIN AULA a              ON aa.id_aula       = a.id_aula
+            WHERE aa.id_aula = :1
+            GROUP BY
+                at.id_tutor_aula,
+                aa.id_aula,
+                at.id_persona,
+                at.motivo_cambio,
+                p.nombre,
+                p.correo,
+                a.id_institucion,
+                a.id_sede,
+                a.grado
+            ORDER BY MAX(aa.fecha_clase) DESC, at.id_tutor_aula DESC
         """, (id_aula,))
         rows = cur.fetchmany(numRows=limit)
 
@@ -1107,6 +1154,14 @@ def asignar_estudiante_a_aula(data: dict) -> int:
 # ============================
 
 def list_horarios_tutor(id_persona: int):
+    """
+    Devuelve los horarios de las aulas donde la persona es tutor ACTUAL.
+    Usa:
+      - ASIGNACION_TUTOR (para llegar de persona a id_tutor_aula actual)
+      - AULA (para saber qué aulas tiene asignadas ese tutor)
+      - HISTORICO_HORARIO_AULA + HORARIO (para ver los horarios del aula)
+    Solo considera asignaciones con fecha_fin IS NULL.
+    """
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -1120,10 +1175,14 @@ def list_horarios_tutor(id_persona: int):
                 h.es_continuo,
                 h.minutos_equiv
             FROM ASIGNACION_TUTOR at
-            JOIN AULA a ON at.id_aula = a.id_aula
-            JOIN HISTORICO_HORARIO_AULA hha ON hha.id_aula = a.id_aula
-            JOIN HORARIO h ON hha.id_horario = h.id_horario
+            JOIN AULA a
+              ON a.id_tutor_aula = at.id_tutor_aula
+            JOIN HISTORICO_HORARIO_AULA hha
+              ON hha.id_aula = a.id_aula
+            JOIN HORARIO h
+              ON hha.id_horario = h.id_horario
             WHERE at.id_persona = :1
+              AND at.fecha_fin IS NULL
         """, (id_persona,))
         rows = cur.fetchall()
         return [

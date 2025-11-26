@@ -35,11 +35,12 @@ class SedeOut(SedeIn):
 # ============================
 
 class PersonaIn(BaseModel):
-    tipo_doc: Optional[str]
+    tipo_doc: str
+    num_documento: str          # <-- NUEVO: requerido por el DDL
     nombre: str
-    telefono: Optional[str]
-    correo: Optional[str]
-    rol: Optional[str]
+    telefono: Optional[str] = None
+    correo: str
+    rol: str
 
 class PersonaOut(PersonaIn):
     id_persona: int
@@ -143,11 +144,12 @@ class PeriodoOut(PeriodoIn):
 class ComponenteIn(BaseModel):
     nombre: str
     porcentaje: float
-    # opcionalmente, tipo de programa si luego lo agregan a la tabla
-    # tipo_programa: Optional[str] = None
+    id_periodo: int                  # <-- nuevo, requerido por el DDL
+    tipo_programa: Optional[str] = None  # opcional, ya que la columna permite NULL
 
 class ComponenteOut(ComponenteIn):
     id_componente: int
+
 
 
 # ============================
