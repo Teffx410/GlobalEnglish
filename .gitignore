@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+history.log
+
+# Environments
+.env
+
+# OS files
+.DS_Store
+
+# Docker
+docker-data/
+*/data/
+*.dbf
+*.ctl
+*.log
+*.ora
+
+# Node (por si el frontend usa JS)
+node_modules/
+dist/
