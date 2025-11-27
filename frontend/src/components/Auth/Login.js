@@ -67,8 +67,12 @@ function Login({ setToken }) {
     <div className="login-bg">
       <div className="login-card">
         <div className="login-header">
+<<<<<<< HEAD
           <img src="/globe.png" alt="GlobalEnglish" className="login-logo" />
           <h2>GlobalEnglish</h2>
+=======
+          <img src="/logo.png" alt="GlobalEnglish" className="login-logo" />
+>>>>>>> main
         </div>
         <form onSubmit={handleSubmit}>
           <label htmlFor="correo">Email</label>
