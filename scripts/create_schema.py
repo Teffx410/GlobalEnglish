@@ -1,4 +1,3 @@
-# scripts/create_schema.py
 import oracledb
 import os
 
@@ -14,19 +13,19 @@ def run_ddl():
     cur = conn.cursor()
     with open(DDL_FILE, 'r', encoding='utf-8') as f:
         ddl = f.read()
-    # split statements by semicolon that are at line end; Oracle accepts single statements so we do best-effort split
+    # Separar instrucciones por punto y coma al final de línea.
     stmts = [s.strip() for s in ddl.split(';') if s.strip()]
     for s in stmts:
         try:
+            print("Ejecutando...")
             cur.execute(s)
         except Exception as e:
-            print("ERROR executing statement:", e)
-            print("STATEMENT (truncated):", s[:200])
+            print("ERROR ejecutando statement:", e)
+            print("STATEMENT (truncado):", s[:200])
     conn.commit()
     cur.close()
     conn.close()
-    print("DDL executed.")
+    print("DDL ejecutado.")
 
 if __name__ == "__main__":
     run_ddl()
-

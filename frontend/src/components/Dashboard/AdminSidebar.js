@@ -1,15 +1,17 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { FaUserCircle } from "react-icons/fa";
+import { FaUserCircle, FaChalkboardTeacher, FaClipboardCheck } from "react-icons/fa";
 import { BsHouse, BsClipboardData, BsPeople, BsCalendar, BsBarChart } from "react-icons/bs";
 import { MdApartment, MdLocationCity, MdSchool, MdWatchLater } from "react-icons/md";
 import { AiOutlineTeam } from "react-icons/ai";
 import "../../styles/AdminDashboard.css";
 
+
 function AdminSidebar() {
   const nombre = localStorage.getItem("nombre_user") || "Sin nombre";
   const rol = localStorage.getItem("rol") || "Sin rol";
   const location = useLocation();
+
 
   function handleLogout() {
     localStorage.removeItem("token");
@@ -18,9 +20,11 @@ function AdminSidebar() {
     window.location.href = "/login";
   }
 
+
   function isActive(path) {
     return location.pathname === path;
   }
+
 
   return (
     <aside className="admin-sidebar">
@@ -118,6 +122,16 @@ function AdminSidebar() {
             </Link>
           </li>
           <li>
+            <Link className={`sidebar-link${isActive("/admin/motivos-inasistencia") ? " active" : ""}`} to="/admin/motivos-inasistencia">
+              <FaClipboardCheck size={22} /> Motivos Inasistencia
+            </Link>
+          </li>
+          <li>
+            <Link className={`sidebar-link${isActive("/admin/ingreso-notas") ? " active" : ""}`} to="/admin/ingreso-notas">
+              <MdSchool size={22} /> Ingreso de Notas
+            </Link>
+          </li>
+          <li>
             <Link className={`sidebar-link${isActive("/admin/reportes") ? " active" : ""}`} to="/admin/reportes">
               <BsBarChart size={22} /> Reportes
             </Link>
@@ -127,11 +141,22 @@ function AdminSidebar() {
               <MdSchool size={22} /> Horario Visual Tutor
             </Link>
           </li>
+          <li>
+            <Link className={`sidebar-link${isActive("/admin/operar-tutor") ? " active" : ""}`} to="/admin/operar-tutor">
+              <FaChalkboardTeacher size={22} /> Operar como Tutor
+            </Link>
+          </li>
+          <li>
+            <Link className={`sidebar-link${isActive("/admin/asistencia-aula") ? " active" : ""}`} to="/admin/asistencia-aula">
+              <FaClipboardCheck size={22} /> Toma de Asistencia
+            </Link>
+          </li>
         </ul>
       </nav>
       <button className="sidebar-logout" onClick={handleLogout}>Cerrar Sesión</button>
     </aside>
   );
 }
+
 
 export default AdminSidebar;

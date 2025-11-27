@@ -42,6 +42,7 @@ function AsignarAula() {
     if (name === "id_sede") {
       setForm(f => ({ ...f, id_aula: "" }));
     }
+    setMsg("");
   }
 
   function aulasFiltradas() {
@@ -55,6 +56,7 @@ function AsignarAula() {
 
   async function asignar(e) {
     e.preventDefault();
+    setMsg("");
     if (!form.id_estudiante || !form.id_aula) {
       setMsg("Selecciona un estudiante y un aula");
       return;
@@ -71,8 +73,12 @@ function AsignarAula() {
         id_sede: "",
         id_aula: ""
       });
-    } catch {
-      setMsg("Error al asignar estudiante");
+    } catch (err) {
+      if (err.response && err.response.data && err.response.data.detail) {
+        setMsg("Error: " + err.response.data.detail);
+      } else {
+        setMsg("Error al asignar estudiante");
+      }
     }
   }
 
@@ -140,7 +146,12 @@ function AsignarAula() {
         </select>
         <button type="submit" className="aulas-btn">Asignar</button>
       </form>
-      {msg && <div style={{ color: msg.includes("Error") ? "red" : "green", marginBottom: "10px" }}>{msg}</div>}
+      {msg && (
+        <div style={{
+          color: msg.toLowerCase().includes("error") ? "red" : "green",
+          marginBottom: "10px"
+        }}>{msg}</div>
+      )}
     </div>
   );
 }

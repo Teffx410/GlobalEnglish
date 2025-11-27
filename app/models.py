@@ -21,14 +21,21 @@ class SedeOut(SedeIn):
 
 
 class PersonaIn(BaseModel):
-    tipo_doc: Optional[str]
+    tipo_doc: str
+    num_documento: str
     nombre: str
-    telefono: Optional[str]
-    correo: Optional[str]
-    rol: Optional[str]
+    telefono: Optional[str] = None
+    correo: str
+    rol: str
+
 
 class PersonaOut(PersonaIn):
     id_persona: int
+
+class UsuarioIn(BaseModel):
+    nombre_user: str
+    id_persona: int
+    contrasena: Optional[str] = None
 
 class AulaIn(BaseModel):
     id_institucion: int
@@ -51,3 +58,65 @@ class EstudianteIn(BaseModel):
 
 class EstudianteOut(EstudianteIn):
     id_estudiante: int
+
+class HistoricoAulaEstudianteIn(BaseModel):
+    id_estudiante: int
+    id_aula: int
+    fecha_inicio: Optional[date] = None  # Puede usar date.today() en el frontend si lo quieres automático
+
+class HorarioIn(BaseModel):
+    dia_semana: str
+    h_inicio: str
+    h_final: str
+    minutos_equiv: Optional[int] = 60
+    es_continuo: Optional[str] = "S"
+
+class HorarioOut(HorarioIn):
+    id_horario: int
+
+class AsignarHorarioAulaIn(BaseModel):
+    id_aula: int
+    id_horario: int
+    fecha_inicio: str  # formato "YYYY-MM-DD"
+
+class AsignarTutorAulaIn(BaseModel):
+    id_persona: int        # id del tutor (de PERSONA)
+    id_aula: int
+    fecha_inicio: Optional[str] = None
+    motivo_cambio: Optional[str] = None
+
+class PeriodoIn(BaseModel):
+    nombre: str
+    fecha_inicio: str   # formato 'YYYY-MM-DD'
+    fecha_fin: str      # formato 'YYYY-MM-DD'
+
+class ComponenteIn(BaseModel):
+    nombre: str
+    porcentaje: float
+    tipo_programa: Optional[str] = None  
+
+
+class AsistenciaAulaIn(BaseModel):
+    id_aula: int
+    id_tutor_aula: int
+    id_horario: int
+    id_semana: int
+    fecha_clase: str
+    hora_inicio: str
+    hora_fin: str = None
+    dictada: str
+    horas_dictadas: int
+    reposicion: str = "N"
+    fecha_reposicion: str = None
+    id_motivo: int = None
+    corresponde_horario: int
+    es_festivo: int
+
+
+class IngresarNotaIn(BaseModel):
+    id_aula: int
+    id_estudiante: int
+    nota: float
+
+class GenerarSemanasRequest(BaseModel):
+    anio: int

@@ -6,6 +6,7 @@ function Instituciones() {
   const [instituciones, setInstituciones] = useState([]);
   const [form, setForm] = useState({ nombre_inst: "", jornada: "", dir_principal: "" });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({ nombre_inst: "", jornada: "", dir_principal: "" });
 
@@ -21,26 +22,44 @@ function Instituciones() {
 
   function agregarInstitucion(e) {
     e.preventDefault();
+    setError("");
+    setSuccess("");
+    
     if (!form.nombre_inst.trim()) {
       setError("El nombre es obligatorio");
       return;
     }
+    
     axios.post("http://localhost:8000/instituciones", form)
       .then(() => {
         setForm({ nombre_inst: "", jornada: "", dir_principal: "" });
-        setError("");
+        setSuccess("Institución agregada correctamente");
+        setTimeout(() => setSuccess(""), 3000);
         cargarInstituciones();
       })
-      .catch(() => setError("No se pudo agregar la institución"));
+      .catch(err => {
+        const mensaje = err.response?.data?.detail || "No se pudo agregar la institución";
+        setError(mensaje);
+      });
   }
 
   function eliminarInstitucion(id) {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar esta institución?")) {
+      return;
+    }
+    
     axios.delete(`http://localhost:8000/instituciones/${id}`)
-      .then(() => cargarInstituciones())
-      .catch(() => setError("Error al eliminar"));
+      .then(() => {
+        setSuccess("Institución eliminada correctamente");
+        setTimeout(() => setSuccess(""), 3000);
+        cargarInstituciones();
+      })
+      .catch(err => {
+        const mensaje = err.response?.data?.detail || "Error al eliminar";
+        setError(mensaje);
+      });
   }
 
-  // Activar modo edición
   function activarEdicion(inst) {
     setEditId(inst.id_institucion);
     setEditForm({
@@ -48,38 +67,49 @@ function Instituciones() {
       jornada: inst.jornada,
       dir_principal: inst.dir_principal
     });
+    setError("");
+    setSuccess("");
   }
 
-  // Cambiar campos en edición
   function handleEditChange(e) {
     setEditForm({ ...editForm, [e.target.name]: e.target.value });
   }
 
-  // Guardar datos editados
   function guardarEdicion(id) {
+    if (!editForm.nombre_inst.trim()) {
+      setError("El nombre es obligatorio");
+      return;
+    }
+    
     axios.put(`http://localhost:8000/instituciones/${id}`, editForm)
       .then(() => {
         setEditId(null);
         setEditForm({ nombre_inst: "", jornada: "", dir_principal: "" });
+        setSuccess("Institución actualizada correctamente");
+        setTimeout(() => setSuccess(""), 3000);
         cargarInstituciones();
       })
-      .catch(() => setError("No se pudo editar la institución"));
+      .catch(err => {
+        const mensaje = err.response?.data?.detail || "No se pudo editar la institución";
+        setError(mensaje);
+      });
   }
 
-  // Cancelar edición
   function cancelarEdicion() {
     setEditId(null);
     setEditForm({ nombre_inst: "", jornada: "", dir_principal: "" });
+    setError("");
   }
 
   return (
     <div className="instituciones-panel">
       <h2>Invitar Institución al Programa</h2>
+      
       <form className="instituciones-form" onSubmit={agregarInstitucion}>
         <input
           type="text"
           name="nombre_inst"
-          placeholder="Nombre Inst"
+          placeholder="Nombre Institución"
           value={form.nombre_inst}
           onChange={e => setForm({ ...form, nombre_inst: e.target.value })}
           required
@@ -100,14 +130,17 @@ function Instituciones() {
         />
         <button type="submit" className="instituciones-btn">Invitar Institución</button>
       </form>
-      {error && <div style={{ color: "red" }}>{error}</div>}
+      
+      {error && <div style={{ color: "#a11", padding: "10px", background: "#ffefef", borderRadius: "4px", marginBottom: "10px" }}>❌ {error}</div>}
+      {success && <div style={{ color: "#237327", padding: "10px", background: "#eaffea", borderRadius: "4px", marginBottom: "10px" }}>✓ {success}</div>}
+      
       <table className="instituciones-table">
         <thead>
           <tr>
-            <th>ID_INSTITUCION</th>
-            <th>NOMBRE_INST</th>
+            <th>ID</th>
+            <th>NOMBRE</th>
             <th>JORNADA</th>
-            <th>DIR_PRINCIPAL</th>
+            <th>DIRECCIÓN</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -122,6 +155,7 @@ function Instituciones() {
                     name="nombre_inst"
                     value={editForm.nombre_inst}
                     onChange={handleEditChange}
+                    style={{ width: "100%" }}
                   />
                 ) : (
                   inst.nombre_inst
@@ -134,9 +168,10 @@ function Instituciones() {
                     name="jornada"
                     value={editForm.jornada}
                     onChange={handleEditChange}
+                    style={{ width: "100%" }}
                   />
                 ) : (
-                  inst.jornada
+                  inst.jornada || "-"
                 )}
               </td>
               <td>
@@ -146,9 +181,10 @@ function Instituciones() {
                     name="dir_principal"
                     value={editForm.dir_principal}
                     onChange={handleEditChange}
+                    style={{ width: "100%" }}
                   />
                 ) : (
-                  inst.dir_principal
+                  inst.dir_principal || "-"
                 )}
               </td>
               <td>
@@ -175,7 +211,7 @@ function Instituciones() {
             </tr>
           ))}
           {instituciones.length === 0 &&
-            <tr><td colSpan={5}>No hay instituciones registradas</td></tr>
+            <tr><td colSpan={5} style={{ textAlign: "center", color: "#999" }}>No hay instituciones registradas</td></tr>
           }
         </tbody>
       </table>

@@ -38,10 +38,12 @@ function Estudiantes() {
   function handleFormChange(e) {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
+    setError("");
   }
 
   function agregarEstudiante(e) {
     e.preventDefault();
+    setError("");
     if (!form.num_documento || !form.nombres) {
       setError("Documento y nombres son obligatorios");
       return;
@@ -60,7 +62,13 @@ function Estudiantes() {
         setError("");
         cargarEstudiantes();
       })
-      .catch(() => setError("No se pudo agregar el estudiante"));
+      .catch(err => {
+        if (err.response && err.response.data && err.response.data.detail) {
+          setError(err.response.data.detail);
+        } else {
+          setError("No se pudo agregar el estudiante");
+        }
+      });
   }
 
   function eliminarEstudiante(id) {
@@ -71,15 +79,21 @@ function Estudiantes() {
 
   function activarEdicion(est) {
     setEditId(est.id_estudiante);
-    setEditForm({ ...est });
+    setEditForm({
+      ...est,
+      fecha_nacimiento: est.fecha_nacimiento ? est.fecha_nacimiento.slice(0, 10) : ""
+    });
+    setError("");
   }
 
   function handleEditChange(e) {
     const { name, value } = e.target;
     setEditForm({ ...editForm, [name]: value });
+    setError("");
   }
 
   function guardarEdicion(id) {
+    setError("");
     axios.put(`http://localhost:8000/estudiantes/${id}`, editForm)
       .then(() => {
         setEditId(null);
@@ -94,7 +108,13 @@ function Estudiantes() {
         });
         cargarEstudiantes();
       })
-      .catch(() => setError("No se pudo editar el estudiante"));
+      .catch(err => {
+        if (err.response && err.response.data && err.response.data.detail) {
+          setError(err.response.data.detail);
+        } else {
+          setError("No se pudo editar el estudiante");
+        }
+      });
   }
 
   function cancelarEdicion() {
@@ -108,6 +128,7 @@ function Estudiantes() {
       fecha_nacimiento: "",
       correo: ""
     });
+    setError("");
   }
 
   return (
