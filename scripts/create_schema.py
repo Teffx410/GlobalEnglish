@@ -4,7 +4,7 @@ import os
 
 USER = os.getenv("DB_USER", "GLOBALENGLISH")
 PASSWORD = os.getenv("DB_PASS", "oracle")
-DSN = os.getenv("DB_DSN", "localhost:1521/XEPDB1")
+DSN = os.getenv("DB_DSN", "localhost:1522/XEPDB1")
 
 DDL_FILE = os.path.join(os.path.dirname(__file__), "..", "ddl.sql")
 

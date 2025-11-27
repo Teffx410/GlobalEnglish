@@ -3,6 +3,10 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import date
 
+# ============================
+# INSTITUCION
+# ============================
+
 class InstitucionIn(BaseModel):
     nombre_inst: str
     jornada: Optional[str] = None
@@ -11,11 +15,24 @@ class InstitucionIn(BaseModel):
 class InstitucionOut(InstitucionIn):
     id_institucion: int
 
+
+# ============================
+# SEDE
+# ============================
+
 class SedeIn(BaseModel):
     id_institucion: int
-    id_sede: int
+    id_sede: int                       # se puede ignorar en el backend si se autogenera
     direccion: Optional[str] = None
     es_principal: Optional[str] = 'N'
+
+class SedeOut(SedeIn):
+    pass    # id_sede ya viene de SedeIn
+
+
+# ============================
+# PERSONA
+# ============================
 
 class PersonaIn(BaseModel):
     tipo_doc: Optional[str]
@@ -27,6 +44,11 @@ class PersonaIn(BaseModel):
 class PersonaOut(PersonaIn):
     id_persona: int
 
+
+# ============================
+# AULA
+# ============================
+
 class AulaIn(BaseModel):
     id_institucion: int
     id_sede: int
@@ -34,6 +56,29 @@ class AulaIn(BaseModel):
 
 class AulaOut(AulaIn):
     id_aula: int
+
+
+# ============================
+# HORARIO
+# ============================
+
+# ============================
+# HORARIO
+# ============================
+
+class HorarioIn(BaseModel):
+    dia_semana: str
+    h_inicio: str       # "HH:MM"
+    h_final: str
+    minutos_equiv: int = 60
+    es_continuo: str = "S"   # "S" o "N"
+
+class HorarioOut(HorarioIn):
+    id_horario: int
+
+# ============================
+# ESTUDIANTE
+# ============================
 
 class EstudianteIn(BaseModel):
     tipo_documento: Optional[str]
@@ -48,3 +93,68 @@ class EstudianteIn(BaseModel):
 
 class EstudianteOut(EstudianteIn):
     id_estudiante: int
+
+
+# ============================
+# USUARIO
+# ============================
+
+class UsuarioIn(BaseModel):
+    nombre_user: str
+    contrasena: str
+    id_persona: int
+
+class UsuarioOut(BaseModel):
+    nombre_user: str
+    correo: str
+    nombre: str
+    rol: str
+    id_persona: int
+
+class AsignarHorarioAulaIn(BaseModel):
+    id_aula: int
+    id_horario: int
+    fecha_inicio: Optional[str] = None  # formato "YYYY-MM-DD" desde el front
+
+class AsignarTutorAulaIn(BaseModel):
+    id_aula: int
+    id_persona: int
+    fecha_inicio: Optional[str] = None  # "YYYY-MM-DD"
+    motivo_cambio: Optional[str] = None
+
+
+# ============================
+# PERIODO
+# ============================
+
+class PeriodoIn(BaseModel):
+    nombre: str
+    fecha_inicio: date
+    fecha_fin: date
+
+class PeriodoOut(PeriodoIn):
+    id_periodo: int
+
+
+# ============================
+# COMPONENTE
+# ============================
+
+class ComponenteIn(BaseModel):
+    nombre: str
+    porcentaje: float
+    # opcionalmente, tipo de programa si luego lo agregan a la tabla
+    # tipo_programa: Optional[str] = None
+
+class ComponenteOut(ComponenteIn):
+    id_componente: int
+
+
+# ============================
+# ASIGNAR ESTUDIANTE A AULA
+# ============================
+
+class AsignarEstudianteAulaIn(BaseModel):
+    id_estudiante: int
+    id_aula: int
+    fecha_inicio: Optional[date] = None  # opcional, si no viene usamos la fecha actual
