@@ -1,28 +1,16 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-<<<<<<< HEAD
 import { FaUserCircle, FaChalkboardTeacher, FaClipboardCheck } from "react-icons/fa";
-=======
-import { FaUserCircle } from "react-icons/fa";
->>>>>>> main
 import { BsHouse, BsClipboardData, BsPeople, BsCalendar, BsBarChart } from "react-icons/bs";
 import { MdApartment, MdLocationCity, MdSchool, MdWatchLater } from "react-icons/md";
 import { AiOutlineTeam } from "react-icons/ai";
 import "../../styles/AdminDashboard.css";
 
-<<<<<<< HEAD
-
-=======
->>>>>>> main
 function AdminSidebar() {
   const nombre = localStorage.getItem("nombre_user") || "Sin nombre";
   const rol = localStorage.getItem("rol") || "Sin rol";
   const location = useLocation();
 
-<<<<<<< HEAD
-
-=======
->>>>>>> main
   function handleLogout() {
     localStorage.removeItem("token");
     localStorage.removeItem("rol");
@@ -30,18 +18,10 @@ function AdminSidebar() {
     window.location.href = "/login";
   }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> main
   function isActive(path) {
     return location.pathname === path;
   }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> main
   return (
     <aside className="admin-sidebar">
       <div className="sidebar-header">
@@ -138,7 +118,6 @@ function AdminSidebar() {
             </Link>
           </li>
           <li>
-<<<<<<< HEAD
             <Link className={`sidebar-link${isActive("/admin/motivos-inasistencia") ? " active" : ""}`} to="/admin/motivos-inasistencia">
               <FaClipboardCheck size={22} /> Motivos Inasistencia
             </Link>
@@ -149,8 +128,6 @@ function AdminSidebar() {
             </Link>
           </li>
           <li>
-=======
->>>>>>> main
             <Link className={`sidebar-link${isActive("/admin/reportes") ? " active" : ""}`} to="/admin/reportes">
               <BsBarChart size={22} /> Reportes
             </Link>
@@ -160,7 +137,6 @@ function AdminSidebar() {
               <MdSchool size={22} /> Horario Visual Tutor
             </Link>
           </li>
-<<<<<<< HEAD
           <li>
             <Link className={`sidebar-link${isActive("/admin/operar-tutor") ? " active" : ""}`} to="/admin/operar-tutor">
               <FaChalkboardTeacher size={22} /> Operar como Tutor
@@ -171,8 +147,6 @@ function AdminSidebar() {
               <FaClipboardCheck size={22} /> Toma de Asistencia
             </Link>
           </li>
-=======
->>>>>>> main
         </ul>
       </nav>
       <button className="sidebar-logout" onClick={handleLogout}>Cerrar Sesión</button>
@@ -180,8 +154,4 @@ function AdminSidebar() {
   );
 }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> main
 export default AdminSidebar;
