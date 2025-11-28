@@ -24,48 +24,6 @@ app.add_middleware(
 # ============================
 # INSTITUCIONES
 # ============================
-=======
-import oracledb
-from typing import Optional
-from fastapi import FastAPI, HTTPException, Depends, Query
-from fastapi.middleware.cors import CORSMiddleware
-
-from app.models import (
-    InstitucionIn, InstitucionOut,
-    PersonaIn, PersonaOut,
-    AulaIn, AulaOut,
-    EstudianteIn, EstudianteOut,
-    SedeIn, SedeOut,
-    UsuarioIn, UsuarioOut,
-    HorarioIn, HorarioOut,
-    AsignarHorarioAulaIn,
-    AsignarTutorAulaIn,
-    PeriodoIn, PeriodoOut,
-    ComponenteIn, ComponenteOut,
-    AsignarEstudianteAulaIn
-)
-
-import app.crud as crud
-import app.reports as reports
-from app.auth import create_token, require_role
-from pydantic import BaseModel
-
-app = FastAPI()
-
-# CORS para React
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ============================
-# INSTITUCIONES
-# ============================
-
->>>>>>> main
 @app.post("/instituciones", response_model=InstitucionOut)
 def create_institucion(payload: InstitucionIn):
     result = crud.create_institucion(payload.dict())
@@ -77,7 +35,6 @@ def create_institucion(payload: InstitucionIn):
     # Obtener id_institucion
     id_inst = result.get("id_institucion")
     if not id_inst:
-<<<<<<< HEAD
         raise HTTPException(status_code=400, detail="No se pudo obtener el ID de la institución creada")
 
     # Validar que venga la dirección principal en el payload
@@ -87,18 +44,10 @@ def create_institucion(payload: InstitucionIn):
     # Crear sede principal automática
     try:
         sede_result = crud.create_sede({
-=======
-        raise HTTPException(status_code=400, detail="No se pudo crear institución")
-
-    # Crear sede principal automática
-    try:
-        crud.create_sede({
->>>>>>> main
             "id_institucion": id_inst,
             "direccion": payload.dir_principal,
             "es_principal": "S"
         })
-<<<<<<< HEAD
 
         if isinstance(sede_result, dict) and "error" in sede_result:
             raise HTTPException(status_code=400, detail=f"No se pudo crear la sede principal: {sede_result['error']}")
@@ -113,13 +62,6 @@ def create_institucion(payload: InstitucionIn):
         raise HTTPException(status_code=500, detail="No se pudo recuperar la institución creada")
 
     return out
-=======
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"No se pudo crear la sede inicial: {e}")
-
-    return crud.get_institucion(id_inst)
-
->>>>>>> main
 
 @app.get("/instituciones")
 def list_instituciones():
@@ -136,22 +78,16 @@ def get_institucion(id_inst: int):
 
 @app.delete("/instituciones/{id_inst}")
 def delete_institucion(id_inst: int):
-<<<<<<< HEAD
     result = crud.delete_institucion(id_inst)
     
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     
     return {"ok": True, "msg": result.get("msg", "Institución eliminada")}
-=======
-    crud.delete_institucion(id_inst)
-    return {"ok": True}
->>>>>>> main
 
 
 @app.put("/instituciones/{id_inst}", response_model=InstitucionOut)
 def update_institucion(id_inst: int, payload: InstitucionIn):
-<<<<<<< HEAD
     # Validar que la institución exista
     inst_existente = crud.get_institucion(id_inst)
     if not inst_existente:
@@ -171,20 +107,10 @@ def update_institucion(id_inst: int, payload: InstitucionIn):
     
     return inst
 
-=======
-    crud.update_institucion(id_inst, payload.dict())
-    inst = crud.get_institucion(id_inst)
-    if not inst:
-        raise HTTPException(status_code=404, detail="No encontrada")
-    return inst
-
-
->>>>>>> main
 # ============================
 # SEDES
 # ============================
 
-<<<<<<< HEAD
 @app.post("/sedes")
 def create_sede(payload: SedeIn):
     result = crud.create_sede(payload.dict())
@@ -198,22 +124,11 @@ def create_sede(payload: SedeIn):
             return out
     
     raise HTTPException(status_code=400, detail="No se pudo crear sede")
-=======
-@app.post("/sedes", response_model=SedeOut)
-def create_sede(payload: SedeIn):
-    id_sede = crud.create_sede(payload.dict())
-    if not id_sede:
-        raise HTTPException(status_code=400, detail="No se pudo crear sede")
-    out = crud.get_sede(payload.id_institucion, id_sede)
-    return out
-
->>>>>>> main
 
 @app.get("/sedes")
 def list_sedes():
     return crud.list_sedes()
 
-<<<<<<< HEAD
 @app.get("/sedes/{id_sede}")
 def get_sede(id_sede: int):
     sede = crud.get_sede(id_sede)
@@ -251,32 +166,6 @@ def update_sede(id_sede: int, payload: SedeIn):
     
     return sede
 
-=======
-
-@app.get("/sedes/{id_institucion}/{id_sede}")
-def get_sede(id_institucion: int, id_sede: int):
-    sede = crud.get_sede(id_institucion, id_sede)
-    if not sede:
-        raise HTTPException(status_code=404, detail="No encontrada")
-    return sede
-
-
-@app.delete("/sedes/{id_institucion}/{id_sede}")
-def delete_sede(id_institucion: int, id_sede: int):
-    crud.delete_sede(id_institucion, id_sede)
-    return {"ok": True}
-
-
-@app.put("/sedes/{id_institucion}/{id_sede}", response_model=SedeOut)
-def update_sede(id_institucion: int, id_sede: int, payload: SedeIn):
-    crud.update_sede(id_institucion, id_sede, payload.dict())
-    sede = crud.get_sede(id_institucion, id_sede)
-    if not sede:
-        raise HTTPException(status_code=404, detail="No encontrada")
-    return sede
-
-
->>>>>>> main
 # ============================
 # PERSONAS
 # ============================
@@ -309,7 +198,6 @@ def create_persona(payload: PersonaIn):
 def list_personas():
     return crud.list_personas()
 
-<<<<<<< HEAD
 @app.put("/personas/{id_persona}")
 def update_persona_endpoint(id_persona: int, payload: PersonaIn):
     result = crud.update_persona(id_persona, payload.dict())
@@ -327,15 +215,12 @@ def delete_persona_endpoint(id_persona: int):
         raise HTTPException(status_code=400, detail=result["error"])
     
     return {"ok": True, "message": "Persona eliminada correctamente"}
-=======
->>>>>>> main
 
 # ============================
 # USUARIOS
 # ============================
 
 @app.post("/usuarios")
-<<<<<<< HEAD
 def crear_usuario(payload: UsuarioIn):
     nombre_user, clave, correo = crud.create_usuario(payload.dict())
     return {
@@ -348,30 +233,10 @@ def crear_usuario(payload: UsuarioIn):
 def listar_usuarios():
     return crud.list_usuarios()
 
-=======
-def create_usuario(payload: UsuarioIn):
-    try:
-        crud.create_usuario(payload.dict())
-        return {
-            "nombre_user": payload.nombre_user,
-            "clave_generada": payload.contrasena,
-            "id_persona": payload.id_persona
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/usuarios")
-def list_usuarios():
-    return crud.list_usuarios()
-
-
->>>>>>> main
 # ============================
 # AULAS
 # ============================
 
-<<<<<<< HEAD
 @app.post("/aulas", response_model=AulaOut)
 def create_aula(payload: AulaIn):
     id_aula = crud.create_aula(payload.dict())
@@ -395,25 +260,12 @@ def get_aula(id_aula: int):
 def delete_aula(id_aula: int):
     crud.delete_aula(id_aula)
     return {"ok": True}
-=======
-@app.get("/aulas")
-def list_aulas():
-    return crud.list_aulas()
-
-
-@app.post("/aulas", response_model=AulaOut)
-def create_aula(payload: AulaIn):
-    id_aula = crud.create_aula(payload.dict())
-    return {"id_aula": id_aula, **payload.dict()}
-
->>>>>>> main
 
 @app.put("/aulas/{id_aula}", response_model=AulaOut)
 def update_aula(id_aula: int, payload: AulaIn):
     crud.update_aula(id_aula, payload.dict())
     aula = crud.get_aula(id_aula)
     if not aula:
-<<<<<<< HEAD
         raise HTTPException(status_code=404, detail="No encontrada")
     return aula
 
@@ -707,155 +559,11 @@ def asignar_estudiante_aula(payload: HistoricoAulaEstudianteIn):
 def historial_estudiante(id_estudiante: int):
     return crud.listar_asignaciones_por_estudiante(id_estudiante)
 # Reports
-=======
-        raise HTTPException(status_code=404, detail="Aula no encontrada")
-    return aula
-
-
-@app.delete("/aulas/{id_aula}")
-def delete_aula(id_aula: int):
-    crud.delete_aula(id_aula)
-    return {"ok": True}
-
-
-# ============================
-# ESTUDIANTES
-# ============================
-
-@app.post("/estudiantes", response_model=EstudianteOut)
-def create_estudiante(payload: EstudianteIn):
-    import app.db as dbmod
-    conn = dbmod.get_conn()
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            INSERT INTO ESTUDIANTE(
-                tipo_documento, num_documento, nombres, apellidos,
-                telefono, fecha_nacimiento, correo, score_entrada
-            )
-            VALUES(:1,:2,:3,:4,:5,:6,:7,:8)
-        """, (
-            payload.tipo_documento,
-            payload.num_documento,
-            payload.nombres,
-            payload.apellidos,
-            payload.telefono,
-            payload.fecha_nacimiento,
-            payload.correo,
-            payload.score_entrada
-        ))
-        conn.commit()
-        cur.execute("""
-            SELECT id_estudiante
-            FROM ESTUDIANTE
-            WHERE num_documento = :1
-            ORDER BY id_estudiante DESC
-        """, (payload.num_documento,))
-        r = cur.fetchone()
-        return {"id_estudiante": r[0], **payload.dict()}
-    finally:
-        cur.close()
-        conn.close()
-
-@app.get("/estudiantes")
-def list_estudiantes():
-    return crud.list_estudiantes()
-
-
-@app.get("/estudiantes/{id_estudiante}", response_model=EstudianteOut)
-def get_estudiante(id_estudiante: int):
-    est = crud.get_estudiante(id_estudiante)
-    if not est:
-        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
-    return est
-
-
-@app.put("/estudiantes/{id_estudiante}", response_model=EstudianteOut)
-def update_estudiante(id_estudiante: int, payload: EstudianteIn):
-    ok = crud.update_estudiante(id_estudiante, payload.dict())
-    if not ok:
-        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
-    return {"id_estudiante": id_estudiante, **payload.dict()}
-
-
-@app.delete("/estudiantes/{id_estudiante}")
-def delete_estudiante(id_estudiante: int):
-    try:
-        ok = crud.delete_estudiante(id_estudiante)
-    except oracledb.IntegrityError:
-        # Hay filas hijas en HISTORICO_AULA_ESTUDIANTE
-        raise HTTPException(
-            status_code=400,
-            detail="No se puede eliminar el estudiante porque tiene historial de aula asociado."
-        )
-
-    if not ok:
-        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
-
-    return {"ok": True}
-
-
-
-@app.post("/asignar-estudiante-aula")
-def asignar_estudiante_aula(payload: AsignarEstudianteAulaIn):
-    try:
-        id_hist = crud.asignar_estudiante_a_aula(payload.dict())
-        return {
-            "msg": "Estudiante asignado correctamente al aula",
-            "id_hist_aula_est": id_hist
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-# ============================
-# PERIODOS
-# ============================
-
-@app.get("/periodos", response_model=list[PeriodoOut])
-def list_periodos():
-    return crud.list_periodos()
-
-
-@app.post("/periodos")
-def create_periodo(payload: PeriodoIn):
-    try:
-        idp = crud.create_periodo(payload.dict())
-        return {"msg": "Periodo creado correctamente", "id_periodo": idp}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-# ============================
-# COMPONENTES
-# ============================
-
-@app.get("/componentes")
-def list_componentes():
-    return crud.list_componentes()
-
-
-@app.post("/componentes")
-def create_componente(payload: ComponenteIn):
-    try:
-        cid = crud.create_componente(payload.dict())
-        return {"msg": "Componente creado correctamente", "id_componente": cid}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-
-# ============================
-# REPORTES
-# ============================
-
->>>>>>> main
 @app.get("/reportes/aula/{id_aula}/asistencia")
 def reporte_aula(id_aula: int, id_semana: int = None):
     return reports.reporte_asistencia_aula(id_aula, id_semana)
 
 
-<<<<<<< HEAD
 
 
 
@@ -950,197 +658,3 @@ def registrar_nota_estudiante(
     nota: float = Body(...)
 ):
     return crud.registrar_nota_estudiante(id_estudiante, id_periodo, id_componente, nota)
-=======
-# ============================
-# LOGIN
-# ============================
-
-class LoginIn(BaseModel):
-    correo: str
-    contrasena: str
-
-@app.post("/login")
-def login(payload: LoginIn):
-    print("****** LOGIN ENDPOINT CALLED ******")
-    print("LOGIN DATA:", payload)
-    try:
-        conn = crud.get_conn()  # OJO: aquí podrías cambiar a app.db.get_conn()
-        cur = conn.cursor()
-        print("Buscando correo:", repr(payload.correo))
-
-        cur.execute("""
-            SELECT u.contrasena, p.rol, u.nombre_user
-            FROM USUARIO u
-            JOIN PERSONA p ON u.id_persona = p.id_persona
-            WHERE TRIM(LOWER(p.correo)) = TRIM(LOWER(:1))
-        """, (payload.correo.strip().lower(),))
-
-        result = cur.fetchone()
-        print("DB QUERY RESULT:", result)
-        if not result:
-            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
-
-        db_pass, rol, nombre_user = result
-        if db_pass != payload.contrasena:
-            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
-
-        token = create_token({"correo": payload.correo, "rol": rol, "nombre_user": nombre_user})
-        print("Rol encontrado en base:", rol)
-
-        return {
-            "ftoken": token,
-            "rol": rol,
-            "nombre_user": nombre_user
-        }
-    except Exception as e:
-        print("ERROR EN LOGIN:", e)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        try:
-            cur.close()
-            conn.close()
-        except:
-            pass
-
-
-# ============================
-# TEST DB
-# ============================
-
-@app.get("/test-db-status")
-def test_db_status():
-    import app.db as dbmod
-    conn = dbmod.get_conn()
-    cur = conn.cursor()
-    info = {}
-
-    cur.execute("SELECT USER FROM DUAL")
-    info["usuario_conectado"] = cur.fetchone()[0]
-
-    cur.execute("SELECT TABLE_NAME FROM USER_TABLES")
-    info["tablas_visibles"] = [row[0] for row in cur.fetchall()]
-
-    cur.execute("SELECT * FROM USUARIO")
-    usuarios = cur.fetchall()
-    info["registros_usuario"] = usuarios
-
-    cur.close()
-    conn.close()
-    return info
-
-
-# ============================
-# HORARIOS
-# ============================
-
-@app.get("/horarios")
-def list_horarios():
-    return crud.list_horarios()
-
-
-@app.post("/horarios", response_model=HorarioOut)
-def create_horario(payload: HorarioIn):
-    data = payload.dict()
-    id_horario = crud.create_horario(data)
-    return {
-        "id_horario": id_horario,
-        **payload.dict()
-    }
-
-
-@app.delete("/horarios/{id_horario}")
-def delete_horario(id_horario: int):
-    try:
-        crud.delete_horario(id_horario)
-        return {"ok": True}
-    except Exception as e:
-        # Esto lo verá el frontend si intenta borrar uno aún activo
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-# ============================
-# ASIGNAR HORARIO A AULA + HISTÓRICO
-# ============================
-
-@app.post("/asignar-horario-aula")
-def asignar_horario_aula(payload: AsignarHorarioAulaIn):
-    """
-    Body: { "id_aula": int, "id_horario": int, "fecha_inicio": "YYYY-MM-DD" (opcional) }
-    """
-    try:
-        new_id = crud.asignar_horario_a_aula(payload.dict())
-        return {"msg": f"Horario asignado correctamente (historial #{new_id})"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/historial-horarios-aula/{id_aula}")
-def historial_horarios_aula(id_aula: int):
-    return crud.get_historial_horarios_aula(id_aula)
-
-@app.put("/historial-horarios-aula/{id_hist_horario}/fin")
-def finalizar_historial(id_hist_horario: int, fecha_fin: Optional[str] = Query(None)):
-    """
-    Marca un registro del historial como finalizado.
-    Si no se pasa fecha_fin, se usa la fecha actual (SYSDATE).
-    """
-    try:
-        crud.finalizar_historial_horario(id_hist_horario, fecha_fin)
-        return {"msg": "Horario marcado como finalizado"}
-    except Exception as e:
-        # Si por ejemplo no había un histórico activo con ese ID, se verá aquí
-        raise HTTPException(status_code=400, detail=str(e))
-    
-# ============================
-# ASIGNAR TUTOR A AULA + HISTÓRICO
-# ============================
-
-@app.post("/asignar-tutor-aula")
-def asignar_tutor_aula(payload: AsignarTutorAulaIn):
-    try:
-        new_id = crud.asignar_tutor_a_aula(payload.dict())
-        return {"msg": f"Tutor asignado correctamente (registro #{new_id})"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/historial-tutores-aula/{id_aula}")
-def historial_tutores_aula(id_aula: int):
-    return crud.get_historial_tutores_aula(id_aula)
-
-@app.put("/asignacion-tutor/{id_tutor_aula}/fin")
-def finalizar_asignacion_tutor_endpoint(
-    id_tutor_aula: int,
-    fecha_fin: Optional[str] = Query(None)
-):
-    """
-    Finaliza una asignación (pone FECHA_FIN).
-    Si no se pasa fecha_fin, usa la fecha actual.
-    """
-    try:
-        crud.finalizar_asignacion_tutor(id_tutor_aula, fecha_fin)
-        return {"msg": "Asignación de tutor finalizada"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.delete("/asignacion-tutor/{id_tutor_aula}")
-def delete_asignacion_tutor_endpoint(id_tutor_aula: int):
-    try:
-        crud.delete_asignacion_tutor(id_tutor_aula)
-        return {"ok": True}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
-
-
-# ============================
-# HORARIOS TUTOR
-# ============================
-
-@app.get("/horarios-tutor/{id_persona}")
-def horarios_tutor(id_persona: int):
-    try:
-        return crud.list_horarios_tutor(id_persona)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
->>>>>>> main
