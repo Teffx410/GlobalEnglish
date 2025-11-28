@@ -1,6 +1,6 @@
+// src/components/AdminCalendarioPorDias.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import AdminFestivos from "./AdminFestivos"; // Tu componente para agregar festivos
 
 const BASE = "http://localhost:8000";
 
@@ -10,6 +10,7 @@ function getMonthName(month) {
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ][month - 1];
 }
+
 function getNumberOfDays(month, year) {
   return new Date(year, month, 0).getDate();
 }
@@ -17,68 +18,88 @@ function getNumberOfDays(month, year) {
 function AdminCalendarioPorDias() {
   const hoy = new Date();
   const [anio, setAnio] = useState(hoy.getFullYear());
-  const [mes, setMes] = useState(hoy.getMonth() + 1); // 1-12
+  const [mes, setMes] = useState(hoy.getMonth() + 1);
   const [festivos, setFestivos] = useState([]);
   const [semanas, setSemanas] = useState([]);
   const [msg, setMsg] = useState("");
   const [generando, setGenerando] = useState(false);
 
-  useEffect(() => { cargarFestivos(); }, [anio, mes]);
+  // form festivos
+  const [festivoForm, setFestivoForm] = useState({
+    fecha: "",
+    descripcion: "",
+  });
+  const [msgFestivo, setMsgFestivo] = useState("");
+
+  useEffect(() => { cargarFestivos(); }, [anio]);
   useEffect(() => { cargarSemanas(); }, [anio]);
 
   const cargarFestivos = async () => {
-    let resp = await axios.get(`${BASE}/admin/listar-festivos?anio=${anio}`);
-    setFestivos(resp.data);
+    const resp = await axios.get(`${BASE}/admin/listar-festivos?anio=${anio}`);
+    setFestivos(resp.data || []);
   };
+
   const cargarSemanas = async () => {
-    let res = await axios.get(`${BASE}/admin/listar-semanas`);
+    const res = await axios.get(`${BASE}/admin/listar-semanas`);
     setSemanas(res.data || []);
   };
-  // Genera semanas para el año seleccionado
+
   const generarSemanas = async () => {
     setGenerando(true);
     setMsg("");
     try {
-      const res = await axios.post(`${BASE}/admin/generar-calendario-semanas?anio=${anio}`);
-      setMsg(res.data.msg || "Semanas generadas.");
+      const res = await axios.post(
+        `${BASE}/admin/generar-calendario-semanas?anio=${anio}`
+      );
+      setMsg(res.data.msg || "Semanas generadas exitosamente.");
       setTimeout(cargarSemanas, 800);
     } catch (err) {
-      setMsg(
-        err.response && err.response.data && err.response.data.detail
-          ? err.response.data.detail
-          : "Error al generar semanas."
+      setMsg(err.response?.data?.detail || "Error al generar semanas.");
+    } finally {
+      setTimeout(() => setGenerando(false), 700);
+    }
+  };
+
+  const handleFestivoChange = e => {
+    const { name, value } = e.target;
+    setFestivoForm(f => ({ ...f, [name]: value }));
+    setMsgFestivo("");
+  };
+
+  const registrarFestivo = async e => {
+    e.preventDefault();
+    if (!festivoForm.fecha || !festivoForm.descripcion.trim()) {
+      setMsgFestivo("Debes ingresar fecha y descripción.");
+      return;
+    }
+    try {
+      const res = await axios.post(`${BASE}/admin/crear-festivo`, festivoForm);
+      setMsgFestivo(res.data.msg || "Festivo registrado.");
+      setFestivoForm({ fecha: "", descripcion: "" });
+      cargarFestivos();
+    } catch (err) {
+      setMsgFestivo(
+        err.response?.data?.detail || "Error al registrar festivo."
       );
     }
-    setTimeout(() => setGenerando(false), 1000);
   };
 
   const diasEnMes = getNumberOfDays(mes, anio);
-  const diasFestivos = festivos
-    .filter(f => parseInt(f.fecha.slice(5, 7)) === mes)
-    .map(f => ({ dia: parseInt(f.fecha.slice(8, 10)), desc: f.descripcion }));
   const primerDia = new Date(anio, mes - 1, 1).getDay();
   const celdasInicio = primerDia === 0 ? 6 : primerDia - 1;
 
-  function semanaDeDia(d) {
-    // yyyy-mm-dd
-    const fechaStr = `${anio}-${mes.toString().padStart(2, "0")}-${d.toString().padStart(2, "0")}`;
-    for (let s of semanas) {
-      if (s.fecha_inicio <= fechaStr && s.fecha_fin >= fechaStr) {
-        return s.numero_semana;
-      }
-    }
-    return "";
-  }
-
   function semanasEnMes() {
-    return semanas
+    return (semanas || [])
       .filter(
         s =>
-          (parseInt(s.fecha_inicio.slice(5, 7)) === mes || parseInt(s.fecha_fin.slice(5, 7)) === mes) &&
+          (parseInt(s.fecha_inicio.slice(5, 7)) === mes ||
+            parseInt(s.fecha_fin.slice(5, 7)) === mes) &&
           parseInt(s.fecha_inicio.slice(0, 4)) === anio
       )
       .sort((a, b) => a.numero_semana - b.numero_semana);
   }
+
+  const semanasMes = semanasEnMes();
 
   const esHoy = d =>
     hoy.getDate() === d &&
@@ -86,87 +107,363 @@ function AdminCalendarioPorDias() {
     hoy.getFullYear() === anio;
 
   return (
-    <div style={{ maxWidth: 760, margin: "auto", background: "#fafdff", borderRadius: 12, padding: "28px 32px" }}>
-      <h2>Calendario mensual</h2>
-      <div style={{ display: "flex", alignItems: "center", gap: 15, marginBottom: 18 }}>
-        <button disabled={generando} onClick={() => setAnio(y => Math.max(2010, parseInt(y) - 1))}>⏪ Año</button>
-        <input type="number" min={2010} max={2100} value={anio} onChange={e => { setAnio(parseInt(e.target.value)); setMes(1); }} style={{ width: 70, textAlign: "center" }} />
-        <button disabled={generando} onClick={() => setAnio(y => Math.min(2100, parseInt(y) + 1))}>Año ⏩</button>
-        <button disabled={generando} onClick={() => setMes(m => m > 1 ? m - 1 : 12)}>&lt; Mes</button>
-        <span style={{ fontWeight: "bold", fontSize: "1.15em" }}>{getMonthName(mes)}</span>
-        <button disabled={generando} onClick={() => setMes(m => m < 12 ? m + 1 : 1)}>Mes &gt;</button>
-        <button className="aulas-btn" style={{ minWidth: 140 }} disabled={generando} onClick={generarSemanas}>
+    <div className="aulas-panel" style={{ maxWidth: "100%", margin: "24px 20px" }}>
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 8,
+        }}
+      >
+        <div>
+          <h2 style={{ marginBottom: 4 }}>Calendario mensual</h2>
+          <span style={{ fontSize: "0.95em", color: "#6b7280" }}>
+            Semanas y festivos académicos del año seleccionado.
+          </span>
+        </div>
+        <button
+          className="aulas-btn"
+          style={{ minWidth: 180 }}
+          disabled={generando}
+          onClick={generando ? undefined : generarSemanas}
+        >
           {generando ? "Generando..." : "Generar semanas"}
         </button>
       </div>
-      {msg && <div style={{ marginBottom: 11, color: msg.toLowerCase().includes("error") ? "#a21" : "#197d2c" }}>{msg}</div>}
 
-      {/* Panel de festivos */}
-      <AdminFestivos anio={anio} />
+      {/* Controles año / mes */}
+      <div
+        className="aulas-form"
+        style={{
+          marginTop: 10,
+          marginBottom: 12,
+          background: "#f4f7fe",
+          borderRadius: 14,
+          padding: "10px 14px",
+          alignItems: "center",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            type="button"
+            className="btn-editar"
+            style={{ padding: "6px 10px" }}
+            disabled={generando}
+            onClick={() => setAnio(y => Math.max(2010, parseInt(y) - 1))}
+          >
+            ⏪
+          </button>
+          <input
+            type="number"
+            min={2010}
+            max={2100}
+            value={anio}
+            onChange={e => {
+              const v = parseInt(e.target.value || hoy.getFullYear());
+              setAnio(v);
+            }}
+            className="aulas-form-input"
+            style={{ width: 90, textAlign: "center" }}
+          />
+          <button
+            type="button"
+            className="btn-editar"
+            style={{ padding: "6px 10px" }}
+            disabled={generando}
+            onClick={() => setAnio(y => Math.min(2100, parseInt(y) + 1))}
+          >
+            ⏩
+          </button>
+        </div>
 
-      <div style={{ margin: "20px 0 0 0" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            className="btn-editar"
+            style={{ padding: "6px 10px" }}
+            disabled={generando}
+            onClick={() => setMes(m => (m > 1 ? m - 1 : 12))}
+          >
+            ◀
+          </button>
+          <span
+            style={{
+              fontWeight: "bold",
+              fontSize: "1.15em",
+              color: "#2563eb",
+              minWidth: 130,
+              textAlign: "center",
+            }}
+          >
+            {getMonthName(mes)} {anio}
+          </span>
+          <button
+            type="button"
+            className="btn-editar"
+            style={{ padding: "6px 10px" }}
+            disabled={generando}
+            onClick={() => setMes(m => (m < 12 ? m + 1 : 1))}
+          >
+            ▶
+          </button>
+        </div>
+      </div>
+
+      {msg && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: "8px 10px",
+            borderRadius: 8,
+            background: msg.toLowerCase().includes("error")
+              ? "#ffe2e2"
+              : "#e0f7ea",
+            color: msg.toLowerCase().includes("error") ? "#b91c1c" : "#166534",
+            fontSize: "0.95em",
+          }}
+        >
+          {msg}
+        </div>
+      )}
+
+      {/* Panel festivos: solo formulario, sin listado de texto */}
+      <div
+        style={{
+          background: "#f9fbff",
+          borderRadius: 14,
+          border: "1px solid #e5e7eb",
+          padding: "10px 14px",
+          marginBottom: 14,
+        }}
+      >
+        <h3 style={{ marginBottom: 10, fontSize: "1.02em" }}>
+          Festivos del {anio}
+        </h3>
+        <form
+          onSubmit={registrarFestivo}
+          className="aulas-form"
+          style={{ marginBottom: 0 }}
+        >
+          <input
+            type="date"
+            name="fecha"
+            value={festivoForm.fecha}
+            onChange={handleFestivoChange}
+            className="aulas-form-input"
+          />
+          <input
+            type="text"
+            name="descripcion"
+            value={festivoForm.descripcion}
+            onChange={handleFestivoChange}
+            placeholder="Descripción"
+            className="aulas-form-input"
+          />
+          <button type="submit" className="aulas-btn">
+            Registrar festivo
+          </button>
+        </form>
+        {msgFestivo && (
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: "0.9em",
+              color: msgFestivo.toLowerCase().includes("error")
+                ? "#b91c1c"
+                : "#166534",
+            }}
+          >
+            {msgFestivo}
+          </div>
+        )}
+      </div>
+
+      {/* Calendario con columna de semanas delgada y festivos sin cambiar tamaño */}
+      <div
+        style={{
+          marginTop: 6,
+          borderRadius: 16,
+          border: "1px solid #e5e7eb",
+          background: "#f9fbff",
+          padding: 12,
+        }}
+      >
+        <table
+          style={{
+            borderCollapse: "separate",
+            borderSpacing: 6,
+            width: "100%",
+            fontSize: "0.96em",
+          }}
+        >
           <thead>
-            <tr style={{ background: "#eee" }}>
-              <th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th><th>Sáb</th><th>Dom</th>
+            <tr>
+              <th
+                style={{
+                  width: 70, // columna semana más delgada
+                  padding: "6px 4px",
+                  textAlign: "left",
+                  color: "#6b7280",
+                  fontWeight: 600,
+                  background: "#eef3ff",
+                  borderRadius: 10,
+                }}
+              >
+                Semana
+              </th>
+              {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(d => (
+                <th
+                  key={d}
+                  style={{
+                    padding: "6px 4px",
+                    textAlign: "center",
+                    color: "#2563eb",
+                    fontWeight: 700,
+                    background: "#eef3ff",
+                    borderRadius: 10,
+                  }}
+                >
+                  {d}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {(() => {
               const filas = [];
               let dia = 1;
-              let semanaActualFila = "";
-              for (let f = 0; dia <= diasEnMes; f++) {
+              let indiceSemanaMes = 0;
+
+              while (dia <= diasEnMes) {
                 const celdas = [];
-                let nroSemanaFila = "";
+                const semanaInfo =
+                  indiceSemanaMes < semanasMes.length
+                    ? semanasMes[indiceSemanaMes]
+                    : null;
+                const etiquetaSemana = semanaInfo
+                  ? `Semana ${semanaInfo.numero_semana}`
+                  : "";
+
+                // Columna de semana
+                celdas.push(
+                  <td
+                    key={`sem-${indiceSemanaMes}`}
+                    style={{
+                      width: 70,
+                      padding: "0 4px",
+                      fontSize: "0.85em",
+                      color: "#6b7280",
+                      verticalAlign: "top",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {etiquetaSemana}
+                  </td>
+                );
+
                 for (let c = 0; c < 7; c++) {
-                  if ((f === 0 && c < celdasInicio) || dia > diasEnMes) {
-                    celdas.push(<td key={`${f}-${c}`} style={{ background: "#fff" }}></td>);
+                  if (filas.length === 0 && c < celdasInicio) {
+                    celdas.push(<td key={`vacio-0-${c}`} />);
+                  } else if (dia > diasEnMes) {
+                    celdas.push(<td key={`vacio-${filas.length}-${c}`} />);
                   } else {
-                    const festivo = diasFestivos.find(df => df.dia === dia);
-                    const nroSem = semanaDeDia(dia);
-                    if (!nroSemanaFila && nroSem) nroSemanaFila = nroSem;
+                    const festivoObj = festivos.find(
+                      f =>
+                        parseInt(f.fecha.slice(0, 4)) === anio &&
+                        parseInt(f.fecha.slice(5, 7)) === mes &&
+                        parseInt(f.fecha.slice(8, 10)) === dia
+                    );
+                    const esFestivo = !!festivoObj;
+                    const esDiaHoy = esHoy(dia);
+                    const fondoBase = esFestivo
+                      ? "#fff5f5"
+                      : esDiaHoy
+                      ? "#e0f2fe"
+                      : "#ffffff";
+
                     celdas.push(
-                      <td key={`${f}-${c}`} style={{
-                        background: festivo ? "#ffefef" : esHoy(dia) ? "#e0fafd" : "#f8fafd",
-                        border: festivo ? "2px solid #e66" : esHoy(dia) ? "2px solid #19b" : "1px solid #dde",
-                        color: festivo ? "#c11" : "#222",
-                        fontWeight: festivo || nroSem ? "bold" : "normal",
-                        textAlign: "center",
-                        borderRadius: 8,
-                        fontSize: nroSem && semanaActualFila !== nroSem ? "1.13em" : "1em"
-                      }}>
-                        {dia}
-                        {festivo && <div style={{ fontSize: "0.83em" }}>★ {festivo.desc}</div>}
-                        {esHoy(dia) && <div style={{ fontSize: "0.78em", color: "#19b" }}>Hoy</div>}
-                        {nroSem && semanaActualFila !== nroSem && (
-                          <div style={{
-                            fontSize: "0.81em", color: "#703eb1", marginTop: 2, fontWeight: 600
-                          }}>Semana {nroSem}</div>
-                        )}
+                      <td
+                        key={`d-${dia}-${c}`}
+                        style={{
+                          padding: 0,
+                          width: "13%",
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: fondoBase,
+                            borderRadius: 12,
+                            border: esFestivo
+                              ? "1.5px solid #f97373"
+                              : esDiaHoy
+                              ? "1.5px solid #2563eb"
+                              : "1px solid #e5e7eb",
+                            width: "100%",
+                            maxWidth: 140,
+                            height: 72,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "flex-start",
+                            padding: "4px 6px",
+                            boxSizing: "border-box",
+                            margin: "0 auto",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: esFestivo ? "#b91c1c" : "#111827",
+                            }}
+                          >
+                            {dia}
+                          </span>
+
+                          {esDiaHoy && (
+                            <span
+                              style={{
+                                fontSize: "0.72em",
+                                color: "#2563eb",
+                                marginTop: 2,
+                              }}
+                            >
+                              Hoy
+                            </span>
+                          )}
+
+                          {esFestivo && (
+                            <span
+                              title={festivoObj.descripcion}
+                              style={{
+                                marginTop: "auto",
+                                fontSize: "0.7em",
+                                color: "#b91c1c",
+                                textAlign: "center",
+                                maxWidth: "100%",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              ★ {festivoObj.descripcion}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     );
-                    semanaActualFila = nroSem || semanaActualFila;
                     dia++;
                   }
                 }
-                filas.push(<tr key={`fila${f}`}>{celdas}</tr>);
+
+                filas.push(<tr key={`fila-${filas.length}`}>{celdas}</tr>);
+                indiceSemanaMes++;
               }
               return filas;
             })()}
           </tbody>
         </table>
-      </div>
-      <div style={{ marginTop: 20 }}>
-        <b>Semanas del mes:</b>
-        <ul>
-          {semanasEnMes().length === 0 && <li style={{ color: "#b51" }}>No hay semanas generadas para este año.</li>}
-          {semanasEnMes().map(s =>
-            <li key={s.id_semana}>
-              <b>Semana {s.numero_semana}:</b> {s.fecha_inicio} → {s.fecha_fin}
-            </li>
-          )}
-        </ul>
       </div>
     </div>
   );

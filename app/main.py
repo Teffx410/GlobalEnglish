@@ -1,6 +1,6 @@
 # app/main.py
 from fastapi import FastAPI, HTTPException, Depends, Query, Body
-from app.models import InstitucionIn, InstitucionOut, PersonaIn,  UsuarioIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut, SedeIn, SedeOut, HistoricoAulaEstudianteIn, HorarioIn, HorarioOut, AsignarHorarioAulaIn, AsignarTutorAulaIn, PeriodoIn, ComponenteIn, AsistenciaAulaIn, IngresarNotaIn
+from app.models import InstitucionIn, InstitucionOut, PersonaIn,  UsuarioIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut, SedeIn, SedeOut, HistoricoAulaEstudianteIn, CambioEstudianteAulaIn, HorarioIn, HorarioOut, AsignarHorarioAulaIn, CambiarTutorAulaIn, AsignarTutorAulaIn, PeriodoIn, ComponenteIn, AsistenciaAulaIn, RegistrarNotaIn, RegistrarAsistenciaEstudianteIn
 import app.crud as crud
 import app.reports as reports
 from app.auth import create_token, require_role
@@ -425,6 +425,7 @@ def asignar_horario_aula(payload: AsignarHorarioAulaIn):
 def historial_horarios_aula(id_aula: int):
     return crud.list_horarios_aula(id_aula)
 
+
 @app.put("/historial-horarios-aula/{id_hist_horario}/fin")
 def finalizar_historial(id_hist_horario: int, fecha_fin: Optional[str] = Query(None)):
     """
@@ -446,17 +447,11 @@ def finalizar_historial(id_hist_horario: int, fecha_fin: Optional[str] = Query(N
 @app.put("/asignacion-tutor/{id_tutor_aula}/fin")
 def finalizar_asignacion_tutor_endpoint(
     id_tutor_aula: int,
-    fecha_fin: Optional[str] = Query(None)
+    fecha_fin: Optional[str] = Query(None),
+    motivo_cambio: Optional[str] = Query(None),
 ):
-    """
-    Finaliza una asignación (pone FECHA_FIN).
-    Si no se pasa fecha_fin, usa la fecha actual.
-    """
-    try:
-        crud.finalizar_asignacion_tutor(id_tutor_aula, fecha_fin)
-        return {"msg": "Asignación de tutor finalizada"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    crud.finalizar_asignacion_tutor(id_tutor_aula, fecha_fin, motivo_cambio)
+    return {"msg": "Asignación de tutor finalizada"}
 
 @app.delete("/asignacion-tutor/{id_tutor_aula}")
 def delete_asignacion_tutor_endpoint(id_tutor_aula: int):
@@ -477,13 +472,17 @@ def asignar_tutor_aula(payload: AsignarTutorAulaIn):
 def historial_tutores_aula(id_aula: int):
     return crud.list_tutores_aula(id_aula)
 
-
+@app.post("/cambiar-tutor-aula")
+def cambiar_tutor_aula_endpoint(payload: CambiarTutorAulaIn):
+    result = crud.cambiar_tutor_aula(payload.dict())
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 # ============================
 # HORARIOS TUTOR
 # ============================
-
 
 @app.post("/periodos")
 def crear_periodo(payload: PeriodoIn):
@@ -494,19 +493,43 @@ def crear_periodo(payload: PeriodoIn):
 def listar_periodos():
     return crud.list_periodos()
 
-@app.post("/componentes")
-def crear_componente(
-    nombre: str = Body(...),
-    porcentaje: float = Body(...),
-    tipo_programa: str = Body(...),
-    id_periodo: int = Body(...)
-):
-    return crud.crear_componente(nombre, porcentaje, tipo_programa, id_periodo)
+@app.put("/periodos/{id_periodo}")
+def actualizar_periodo(id_periodo: int, payload: PeriodoIn):
+    crud.update_periodo(id_periodo, payload.dict())
+    return {"msg": "Periodo actualizado."}
 
-
+@app.delete("/periodos/{id_periodo}")
+def eliminar_periodo(id_periodo: int):
+    try:
+        crud.delete_periodo(id_periodo)
+        return {"msg": "Periodo eliminado."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 @app.get("/componentes")
 def listar_componentes():
     return crud.list_componentes()
+
+@app.post("/componentes")
+def crear_componente_endpoint(payload: ComponenteIn):
+    r = crud.crear_componente(**payload.dict())
+    if not r["ok"]:
+        raise HTTPException(status_code=400, detail=r["msg"])
+    return r
+
+
+@app.put("/componentes/{id_componente}")
+def actualizar_componente_endpoint(id_componente: int, payload: ComponenteIn):
+    r = crud.actualizar_componente(id_componente, **payload.dict())
+    if not r["ok"]:
+        raise HTTPException(status_code=400, detail=r["msg"])
+    return r
+
+@app.delete("/componentes/{id_componente}")
+def eliminar_componente_endpoint(id_componente: int):
+    r = crud.eliminar_componente(id_componente)
+    if not r["ok"]:
+        raise HTTPException(status_code=400, detail=r["msg"])
+    return r
 
 @app.get("/horarios-tutor/{id_persona}")
 def horarios_tutor(id_persona: int):
@@ -518,9 +541,11 @@ def listar_tutores():
     return crud.listar_tutores()
 
 # --- Listar aulas de un tutor (seleccionado por el admin) ---
-@app.get("/aulas-tutor/{id_tutor}")
-def aulas_por_tutor(id_tutor: int):
-    return crud.get_aulas_por_tutor(id_tutor)
+@app.get("/admin/listar-aulas-tutor")
+def listar_aulas_tutor(id_persona: int):
+    return crud.listar_aulas_tutor(id_persona)
+
+
 
 # --- Tomar asistencia "como ese tutor" ---
 @app.post("/asistir-aula")
@@ -537,30 +562,82 @@ def modificar_asistencia(id_asist: int, payload: AsistenciaAulaIn):
         raise HTTPException(status_code=400, detail=result["error"])
     return {"msg": "Asistencia modificada correctamente."}
 
+@app.post("/admin/registrar-asistencia-estudiante")
+def registrar_asistencia_estudiante(payload: RegistrarAsistenciaEstudianteIn):
+    """
+    Inserta o actualiza la asistencia de un estudiante para una clase específica.
+    """
+    r = crud.registrar_asistencia_estudiante(payload.dict())
+    if isinstance(r, dict) and r.get("error"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+# en main.py, si quieres endpoint explícito
+@app.get("/horarios-aula-activos/{id_aula}")
+def horarios_aula_activos(id_aula: int):
+    return crud.list_horarios_aula_activos(id_aula)
+
+
 # --- Ingresar nota "como ese tutor" ---
-@app.post("/ingresar-nota")
-def ingresar_nota(payload: IngresarNotaIn):
-    crud.ingresar_nota(payload.dict())
-    return {"msg": "Nota registrada"}
+@app.post("/admin/registrar-nota-estudiante")
+def registrar_nota_estudiante(payload: RegistrarNotaIn):
+    r = crud.registrar_o_actualizar_nota(
+        payload.id_estudiante,
+        payload.id_componente,
+        payload.nota,
+    )
+    if not r["ok"]:
+        raise HTTPException(status_code=400, detail=r.get("msg", "Error"))
+    return r
 
+@app.get("/admin/obtener-nota-estudiante")
+def obtener_nota_estudiante(id_estudiante: int, id_componente: int):
+    return crud.obtener_nota_estudiante(id_estudiante, id_componente)
 
+@app.get("/admin/listar-componentes-periodo-tipo")
+def listar_componentes_periodo_tipo(id_periodo: int, tipo_programa: str):
+    return crud.listar_componentes_periodo_tipo(id_periodo, tipo_programa)
 
-
-@app.get("/horarios-aula/{id_aula}")
-def horarios_por_aula(id_aula: int):
-    return crud.get_horarios_aula(id_aula)
 
 @app.post("/asignar-estudiante-aula")
-def asignar_estudiante_aula(payload: HistoricoAulaEstudianteIn):
+def asignar_estudiante_aula_endpoint(payload: HistoricoAulaEstudianteIn):
     result = crud.asignar_estudiante_aula(payload.dict())
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
+@app.get("/estudiantes-aula/{id_aula}")
+def estudiantes_aula(id_aula: int):
+    return crud.listar_estudiantes_de_aula(id_aula)
 
-@app.get("/historial-estudiante/{id_estudiante}")
-def historial_estudiante(id_estudiante: int):
-    return crud.listar_asignaciones_por_estudiante(id_estudiante)
+@app.put("/hist-aula-estudiante/{id_hist_aula_est}/fin")
+def finalizar_asignacion_estudiante_endpoint(
+    id_hist_aula_est: int,
+    fecha_fin: Optional[str] = None,
+):
+    try:
+        crud.finalizar_asignacion_estudiante(id_hist_aula_est, fecha_fin)
+        return {"msg": "Asignación de estudiante finalizada."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/cambiar-estudiante-aula")
+def cambiar_estudiante_aula_endpoint(payload: CambioEstudianteAulaIn):
+    result = crud.cambiar_estudiante_aula(payload.dict())
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@app.get("/estudiantes-disponibles/{id_aula}")
+def estudiantes_disponibles(id_aula: int):
+    # id_aula se recibe por consistencia, aunque la función no lo use
+    return crud.listar_estudiantes_disponibles_para_aula(id_aula)
+
+@app.get("/estudiantes-aula/{id_aula}")
+def estudiantes_aula(id_aula: int):
+    return crud.listar_estudiantes_de_aula(id_aula)
+
 # Reports
 @app.get("/reportes/aula/{id_aula}/asistencia")
 def reporte_aula(id_aula: int, id_semana: int = None):
@@ -628,6 +705,23 @@ def modificar_motivo_inasistencia(payload: dict = Body(...)):
 def listar_clases_tutor(id_persona: int = Query(...)):
     return crud.listar_clases_tutor(id_persona)
 
+@app.get("/admin/listar-asistencia-estudiantes")
+def listar_asistencia_estudiantes(id_asist: int):
+    """
+    Devuelve los estudiantes del aula de esa asistencia, con su marca de asistencia (S/N) y observación.
+    """
+    return crud.listar_asistencia_estudiantes(id_asist)
+
+# app/main.py
+
+@app.get("/admin/listar-asistencia-estudiantes-todas")
+def listar_asistencia_estudiantes_todas(id_persona: int):
+    """
+    Historial plano de asistencia por estudiante para todas las clases
+    de un tutor (una fila por estudiante x clase).
+    """
+    return crud.listar_asistencia_estudiantes_todas(id_persona)
+
 
 @app.get("/admin/listar-tutores")
 def listar_tutores():
@@ -648,10 +742,6 @@ def listar_periodos():
 @app.get("/admin/listar-componentes-periodo")
 def listar_componentes_periodo(id_periodo: int = Query(...)):
     return crud.listar_componentes_periodo(id_periodo)
-
-@app.get("/admin/obtener-nota-estudiante")
-def obtener_nota_estudiante(id_estudiante: int = Query(...), id_periodo: int = Query(...), id_componente: int = Query(...)):
-    return crud.obtener_nota_estudiante(id_estudiante, id_periodo, id_componente)
 
 @app.post("/admin/registrar-nota-estudiante")
 def registrar_nota_estudiante(

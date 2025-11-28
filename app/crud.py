@@ -438,16 +438,19 @@ def create_aula(data: dict):
     cur = conn.cursor()
     try:
         cur.execute("""
-            INSERT INTO AULA (id_institucion, id_sede, grado, id_tutor_aula)
-            VALUES (:1, :2, :3, NULL)
-        """, (data['id_institucion'], data['id_sede'], data['grado']))
+            INSERT INTO AULA (id_institucion, id_sede, grado)
+            VALUES (:1, :2, :3)
+        """, (data["id_institucion"], data["id_sede"], data["grado"]))
         conn.commit()
 
         cur.execute("""
-            SELECT id_aula FROM AULA
-            WHERE id_institucion=:1 AND id_sede=:2 AND grado=:3
+            SELECT id_aula
+            FROM AULA
+            WHERE id_institucion = :1
+              AND id_sede = :2
+              AND grado = :3
             ORDER BY id_aula DESC
-        """, (data['id_institucion'], data['id_sede'], data['grado']))
+        """, (data["id_institucion"], data["id_sede"], data["grado"]))
         r = cur.fetchone()
         return r[0] if r else None
     finally:
@@ -455,12 +458,12 @@ def create_aula(data: dict):
         conn.close()
 
 
-def list_aulas(limit=100):
+def list_aulas(limit: int = 100):
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT id_aula, id_institucion, id_sede, grado, id_tutor_aula
+            SELECT id_aula, id_institucion, id_sede, grado
             FROM AULA
             ORDER BY id_aula
         """)
@@ -471,7 +474,6 @@ def list_aulas(limit=100):
                 id_institucion=r[1],
                 id_sede=r[2],
                 grado=r[3],
-                id_tutor_aula=r[4]
             )
             for r in rows
         ]
@@ -480,12 +482,12 @@ def list_aulas(limit=100):
         conn.close()
 
 
-def get_aula(id_aula):
+def get_aula(id_aula: int):
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT id_aula, id_institucion, id_sede, grado, id_tutor_aula
+            SELECT id_aula, id_institucion, id_sede, grado
             FROM AULA
             WHERE id_aula = :1
         """, (id_aula,))
@@ -497,38 +499,41 @@ def get_aula(id_aula):
             id_institucion=r[1],
             id_sede=r[2],
             grado=r[3],
-            id_tutor_aula=r[4]
         )
     finally:
         cur.close()
         conn.close()
 
 
-def update_aula(id_aula, data: dict):
+def update_aula(id_aula: int, data: dict):
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute("""
-            UPDATE AULA SET
-                id_institucion = :1,
+            UPDATE AULA
+            SET id_institucion = :1,
                 id_sede        = :2,
                 grado          = :3
-            WHERE id_aula = :4
-        """, (data['id_institucion'], data['id_sede'], data['grado'], id_aula))
+            WHERE id_aula      = :4
+        """, (data["id_institucion"], data["id_sede"], data["grado"], id_aula))
         conn.commit()
     finally:
         cur.close()
         conn.close()
 
-def delete_aula(id_aula):
+
+def delete_aula(id_aula: int):
     conn = get_conn()
     cur = conn.cursor()
     try:
+        # si quieres, aquí primero borrar filas relacionadas en TUTOR_AULA
+        cur.execute("DELETE FROM TUTOR_AULA WHERE id_aula = :1", (id_aula,))
         cur.execute("DELETE FROM AULA WHERE id_aula = :1", (id_aula,))
         conn.commit()
     finally:
         cur.close()
         conn.close()
+
 
 # ============================
 # HORARIOS
@@ -826,55 +831,57 @@ def finalizar_historial_horario(id_hist_horario: int, fecha_fin: Optional[str] =
         cur.close()
         conn.close()
 
-def list_horarios_aula(id_aula):
+def list_horarios_aula(id_aula: int):
+    """
+    Historial completo de horarios de un aula (activos e inactivos).
+    Usado en la pantalla 'Asignar horario a aula'.
+    """
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT h.id_hist_horario, h.id_horario, h.fecha_inicio, h.fecha_fin,
-            ho.dia_semana, ho.h_inicio, ho.h_final, ho.minutos_equiv, ho.es_continuo
-        FROM HISTORICO_HORARIO_AULA h
-        JOIN HORARIO ho ON h.id_horario = ho.id_horario
-        WHERE h.id_aula = :1
-        ORDER BY h.fecha_inicio DESC
-    """, (id_aula,))
-    rows = cur.fetchall()
-    result = [
-        dict(
-            id_hist_horario=r[0], id_horario=r[1], fecha_inicio=str(r[2]),
-            fecha_fin=str(r[3]) if r[3] else None,
-            dia_semana=r[4], h_inicio=r[5], h_final=r[6],
-            minutos_equiv=r[7], es_continuo=r[8]
-        ) for r in rows
-    ]
-    cur.close()
-    conn.close()
-    return result
+    try:
+        cur.execute("""
+            SELECT
+              hha.id_hist_horario,
+              hha.id_horario,
+              hha.fecha_inicio,
+              hha.fecha_fin,
+              ho.dia_semana,
+              ho.h_inicio,
+              ho.h_final,
+              ho.minutos_equiv,
+              ho.es_continuo
+            FROM HISTORICO_HORARIO_AULA hha
+            JOIN HORARIO ho ON hha.id_horario = ho.id_horario
+            WHERE hha.id_aula = :1
+            ORDER BY hha.fecha_inicio, ho.dia_semana, ho.h_inicio
+        """, (id_aula,))
+        rows = cur.fetchall()
+        return [
+            {
+                "id_hist_horario": r[0],
+                "id_horario":      r[1],
+                "fecha_inicio":    r[2].strftime("%Y-%m-%d") if r[2] else None,
+                "fecha_fin":       r[3].strftime("%Y-%m-%d") if r[3] else None,
+                "dia_semana":      r[4],
+                "h_inicio":        r[5].strftime("%H:%M") if hasattr(r[5], "strftime") else str(r[5])[:5],
+                "h_final":         r[6].strftime("%H:%M") if hasattr(r[6], "strftime") else str(r[6])[:5],
+                "minutos_equiv":   r[7],
+                "es_continuo":     r[8],
+            }
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
 
 # ============================
 # ASIGNACIÓN TUTOR AULA
 # ============================
 
-def cerrar_tutor_actual(id_aula: int):
-    """Cierra la asignación activa del tutor actual del aula"""
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            UPDATE ASIGNACION_TUTOR at
-            SET fecha_fin = SYSDATE
-            WHERE at.id_tutor_aula = (
-                SELECT id_tutor_aula 
-                FROM AULA 
-                WHERE id_aula = :1
-            )
-            AND at.fecha_fin IS NULL
-        """, (id_aula,))
-        conn.commit()
-    finally:
-        cur.close()
-        conn.close()
-
 def list_tutores_aula(id_aula: int):
+    """
+    Historial de tutores de un aula usando TUTOR_AULA.
+    """
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -887,11 +894,11 @@ def list_tutores_aula(id_aula: int):
                 at.motivo_cambio,
                 p.nombre,
                 p.correo
-            FROM ASIGNACION_TUTOR at
-            JOIN PERSONA p ON at.id_persona = p.id_persona
-            JOIN AULA a ON a.id_tutor_aula = at.id_tutor_aula
-            WHERE a.id_aula = :1
-            ORDER BY at.fecha_inicio DESC
+            FROM TUTOR_AULA ta
+            JOIN ASIGNACION_TUTOR at ON ta.id_tutor_aula = at.id_tutor_aula
+            JOIN PERSONA p          ON at.id_persona = p.id_persona
+            WHERE ta.id_aula = :1
+            ORDER BY at.fecha_inicio ASC, at.id_tutor_aula ASC
         """, (id_aula,))
         rows = cur.fetchall()
         return [
@@ -910,86 +917,126 @@ def list_tutores_aula(id_aula: int):
         cur.close()
         conn.close()
 
-# --- VALIDACIÓN CRUCE TUTOR ---
 
-def validar_cruce_tutor(id_persona: int, id_aula: int, fecha_inicio: str) -> tuple[bool, str]:
-    id_persona = int(id_persona)
-    id_aula = int(id_aula)
-
+def aula_tiene_tutor_activo(id_aula: int) -> bool:
+    """
+    ¿Hay alguna asignación en ese aula con fecha_fin NULL?
+    """
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute("""
             SELECT COUNT(*)
-            FROM ASIGNACION_TUTOR at
-                 JOIN AULA a ON a.id_tutor_aula = at.id_tutor_aula
-            WHERE at.id_persona = :1
+            FROM TUTOR_AULA ta
+            JOIN ASIGNACION_TUTOR at ON ta.id_tutor_aula = at.id_tutor_aula
+            WHERE ta.id_aula = :1
               AND at.fecha_fin IS NULL
-              AND a.id_aula <> :2
-        """, (id_persona, id_aula))
+        """, (id_aula,))
         (count,) = cur.fetchone()
-        if count > 0:
-            return False, "El tutor ya tiene una asignación activa en otra aula."
-        return True, ""
+        return count > 0
     finally:
         cur.close()
         conn.close()
 
-# ---------- ASIGNAR TUTOR ----------
 
 def asignar_tutor_aula(data: dict):
+    """
+    Asigna tutor SOLO si el aula NO tiene tutor activo.
+    Inserta en ASIGNACION_TUTOR y vincula en TUTOR_AULA.
+    """
     id_persona = int(data["id_persona"])
     id_aula = int(data["id_aula"])
-    fecha_inicio = str(data["fecha_inicio"])[:10]   # 'YYYY-MM-DD'
+    fecha_inicio = str(data["fecha_inicio"])[:10]
     motivo = data.get("motivo_cambio")
 
-    valido, msg = validar_cruce_tutor(id_persona, id_aula, fecha_inicio)
-    if not valido:
-        return {"error": msg}
+    if aula_tiene_tutor_activo(id_aula):
+        return {
+            "error": "El aula ya tiene un tutor activo. Use la opción de 'Finalizar y cambiar tutor'."
+        }
 
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # Cerrar tutor actual del aula (si lo hay)
-        cur.execute("""
-            UPDATE ASIGNACION_TUTOR at
-            SET fecha_fin = SYSDATE
-            WHERE at.id_tutor_aula = (
-                SELECT id_tutor_aula FROM AULA WHERE id_aula = :1
-            )
-              AND at.fecha_fin IS NULL
-        """, (id_aula,))
-
-        # Insertar nueva asignación
+        # nueva asignación
         new_id = cur.var(oracledb.NUMBER)
         cur.execute("""
             INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, motivo_cambio)
             VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), :3)
             RETURNING id_tutor_aula INTO :4
         """, (id_persona, fecha_inicio, motivo, new_id))
-
         id_tutor_aula = int(new_id.getvalue()[0])
 
-        # Actualizar AULA con el nuevo tutor
+        # vincular al aula
         cur.execute("""
-            UPDATE AULA
-            SET id_tutor_aula = :1
-            WHERE id_aula = :2
+            INSERT INTO TUTOR_AULA (id_tutor_aula, id_aula)
+            VALUES (:1, :2)
         """, (id_tutor_aula, id_aula))
 
         conn.commit()
-        return {
-            "msg": "Tutor asignado al aula. Se conserva el historial.",
-            "id_tutor_aula": id_tutor_aula
-        }
+        return {"msg": "Tutor asignado al aula.", "id_tutor_aula": id_tutor_aula}
     finally:
         cur.close()
         conn.close()
 
-def finalizar_asignacion_tutor(id_tutor_aula: int, fecha_fin: Optional[str] = None):
+
+def cambiar_tutor_aula(data: dict):
     """
-    Marca una asignación de tutor como finalizada (pone FECHA_FIN).
-    Solo actúa si FECHA_FIN es NULL.
+    Finaliza tutor actual de esa aula y crea nueva asignación para el nuevo tutor.
+    Usa TUTOR_AULA para mantener el historial.
+    """
+    id_aula = int(data["id_aula"])
+    id_persona_nuevo = int(data["id_persona"])
+    fecha_inicio_nuevo = str(data["fecha_inicio"])[:10]
+    motivo = data["motivo_cambio"]
+    id_tutor_aula_actual = int(data["id_tutor_aula_actual"])
+    fecha_fin_actual = data.get("fecha_fin_actual")
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # cerrar asignación actual
+        if fecha_fin_actual:
+            cur.execute("""
+                UPDATE ASIGNACION_TUTOR
+                SET fecha_fin = TO_DATE(:1, 'YYYY-MM-DD'),
+                    motivo_cambio = :2
+                WHERE id_tutor_aula = :3
+                  AND fecha_fin IS NULL
+            """, (fecha_fin_actual, motivo, id_tutor_aula_actual))
+        else:
+            cur.execute("""
+                UPDATE ASIGNACION_TUTOR
+                SET fecha_fin = SYSDATE,
+                    motivo_cambio = :1
+                WHERE id_tutor_aula = :2
+                  AND fecha_fin IS NULL
+            """, (motivo, id_tutor_aula_actual))
+
+        # nueva asignación
+        new_id = cur.var(oracledb.NUMBER)
+        cur.execute("""
+            INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, motivo_cambio)
+            VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), :3)
+            RETURNING id_tutor_aula INTO :4
+        """, (id_persona_nuevo, fecha_inicio_nuevo, motivo, new_id))
+        id_tutor_aula_nuevo = int(new_id.getvalue()[0])
+
+        # vincular nueva asignación al aula
+        cur.execute("""
+            INSERT INTO TUTOR_AULA (id_tutor_aula, id_aula)
+            VALUES (:1, :2)
+        """, (id_tutor_aula_nuevo, id_aula))
+
+        conn.commit()
+        return {"msg": "Tutor cambiado correctamente.", "id_tutor_aula": id_tutor_aula_nuevo}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def finalizar_asignacion_tutor(id_tutor_aula: int, fecha_fin: Optional[str] = None, motivo: Optional[str] = None):
+    """
+    Marca una asignación de tutor como finalizada (pone FECHA_FIN y opcionalmente motivo).
     """
     conn = get_conn()
     cur = conn.cursor()
@@ -997,39 +1044,23 @@ def finalizar_asignacion_tutor(id_tutor_aula: int, fecha_fin: Optional[str] = No
         if fecha_fin:
             cur.execute("""
                 UPDATE ASIGNACION_TUTOR
-                SET fecha_fin = TO_DATE(:1, 'YYYY-MM-DD')
-                WHERE id_tutor_aula = :2
+                SET fecha_fin = TO_DATE(:1, 'YYYY-MM-DD'),
+                    motivo_cambio = COALESCE(:2, motivo_cambio)
+                WHERE id_tutor_aula = :3
                   AND fecha_fin IS NULL
-            """, (fecha_fin, id_tutor_aula))
+            """, (fecha_fin, motivo, id_tutor_aula))
         else:
             cur.execute("""
                 UPDATE ASIGNACION_TUTOR
-                SET fecha_fin = SYSDATE
-                WHERE id_tutor_aula = :1
+                SET fecha_fin = SYSDATE,
+                    motivo_cambio = COALESCE(:1, motivo_cambio)
+                WHERE id_tutor_aula = :2
                   AND fecha_fin IS NULL
-            """, (id_tutor_aula,))
+            """, (motivo, id_tutor_aula))
 
         if cur.rowcount == 0:
-            # No se actualizó nada: o no existe o ya estaba finalizada
             raise Exception("No se encontró una asignación activa con ese ID")
 
-        conn.commit()
-    finally:
-        cur.close()
-        conn.close()
-
-def delete_asignacion_tutor(id_tutor_aula: int):
-    """
-    Elimina una fila de ASIGNACION_TUTOR por ID_TUTOR_AULA.
-    (Solo afecta histórico de tutores, no PERSONA ni AULA).
-    """
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        cur.execute("DELETE FROM ASIGNACION_TUTOR WHERE id_tutor_aula = :1",
-                    (id_tutor_aula,))
-        if cur.rowcount == 0:
-            raise Exception("No se encontró una asignación con ese ID")
         conn.commit()
     finally:
         cur.close()
@@ -1038,6 +1069,41 @@ def delete_asignacion_tutor(id_tutor_aula: int):
 # ============================
 # HISTÓRICO AULA ESTUDIANTE
 # ============================
+def get_grado_aula(id_aula: int) -> int:
+    """
+    Devuelve el grado numérico del aula (asumiendo que AULA.grado almacena un número o un texto convertible a int).
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT grado FROM AULA WHERE id_aula = :1", (id_aula,))
+        r = cur.fetchone()
+        if not r or r[0] is None:
+            raise Exception("No se encontró el aula especificada.")
+        return int(r[0])
+    finally:
+        cur.close()
+        conn.close()
+
+
+def validar_cambio_grado(id_aula_origen: int, id_aula_destino: int) -> tuple[bool, str]:
+    """
+    Valida la regla:
+      - Un estudiante solo se puede mover entre aulas 4º y/o 5º, o entre 9º y/o 10º.
+      - No se puede mezclar primaria con secundaria u otros grados.
+    """
+    grado_origen = get_grado_aula(id_aula_origen)
+    grado_destino = get_grado_aula(id_aula_destino)
+
+    grupo_primaria = {4, 5}
+    grupo_secundaria = {9, 10}
+
+    if grado_origen in grupo_primaria and grado_destino in grupo_primaria:
+        return True, ""
+    if grado_origen in grupo_secundaria and grado_destino in grupo_secundaria:
+        return True, ""
+
+    return False, "El estudiante solo puede moverse entre aulas 4°-5° o entre 9°-10°. No se permiten cruces entre otros grados."
 
 def asignar_estudiante_aula(data):
     conn = get_conn()
@@ -1051,9 +1117,11 @@ def asignar_estudiante_aula(data):
         cur.close()
         conn.close()
         return {"error": "El estudiante ya pertenece a un aula activa."}
-    # Si no, inserta la nueva asignación
-    from datetime import date
-    fecha = data.get('fecha_inicio') or date.today().isoformat()
+
+    fecha = data.get('fecha_inicio')
+    if not fecha:
+        fecha = date.today().isoformat()
+
     cur.execute("""
         INSERT INTO HISTORICO_AULA_ESTUDIANTE (id_estudiante, id_aula, fecha_inicio)
         VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'))
@@ -1064,24 +1132,126 @@ def asignar_estudiante_aula(data):
     return {"msg": "Estudiante asignado correctamente"}
 
 
-def listar_asignaciones_por_estudiante(id_estudiante):
+def listar_estudiantes_de_aula(id_aula: int):
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT h.id_hist_aula_est, h.id_estudiante, h.id_aula, 
-                   a.id_institucion, a.id_sede, a.grado,
-                   h.fecha_inicio, h.fecha_fin
+            SELECT 
+                h.id_hist_aula_est,
+                e.id_estudiante,
+                e.nombres,
+                e.apellidos,
+                h.fecha_inicio,
+                h.fecha_fin
             FROM HISTORICO_AULA_ESTUDIANTE h
-            JOIN AULA a ON h.id_aula = a.id_aula
-            WHERE h.id_estudiante = :1
-        """, (id_estudiante,))
+            JOIN ESTUDIANTE e ON h.id_estudiante = e.id_estudiante
+            WHERE h.id_aula = :1
+            ORDER BY e.nombres, e.apellidos
+        """, (id_aula,))
         rows = cur.fetchall()
         return [
-            dict(id_hist_aula_est=r[0], id_estudiante=r[1], id_aula=r[2],
-                 id_institucion=r[3], id_sede=r[4], grado=r[5], 
-                 fecha_inicio=str(r[6]), fecha_fin=str(r[7]) if r[7] else None) for r in rows
+            dict(
+                id_hist_aula_est=r[0],
+                id_estudiante=r[1],
+                nombres=r[2],
+                apellidos=r[3],
+                fecha_inicio=r[4].strftime("%Y-%m-%d") if r[4] else None,
+                fecha_fin=r[5].strftime("%Y-%m-%d") if r[5] else None,
+            )
+            for r in rows
         ]
+    finally:
+        cur.close()
+        conn.close()
+
+def finalizar_asignacion_estudiante(id_hist_aula_est: int, fecha_fin: str | None = None):
+    """
+    Marca una fila de HISTORICO_AULA_ESTUDIANTE como finalizada (fecha_fin).
+    Solo si fecha_fin está NULL.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        if fecha_fin:
+            cur.execute("""
+                UPDATE HISTORICO_AULA_ESTUDIANTE
+                SET fecha_fin = TO_DATE(:1, 'YYYY-MM-DD')
+                WHERE id_hist_aula_est = :2
+                  AND fecha_fin IS NULL
+            """, (fecha_fin, id_hist_aula_est))
+        else:
+            cur.execute("""
+                UPDATE HISTORICO_AULA_ESTUDIANTE
+                SET fecha_fin = SYSDATE
+                WHERE id_hist_aula_est = :1
+                  AND fecha_fin IS NULL
+            """, (id_hist_aula_est,))
+
+        if cur.rowcount == 0:
+            raise Exception("No se encontró una asignación activa para ese estudiante en esa aula.")
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def cambiar_estudiante_aula(data: dict):
+    """
+    Cierra la asignación actual (id_hist_aula_est) y crea una nueva en otra aula,
+    validando las reglas de grado.
+    data:
+      - id_hist_aula_est: histórico actual
+      - id_aula_origen
+      - id_aula_destino
+      - id_estudiante
+      - fecha_fin_actual (opcional)
+      - fecha_inicio_nueva (obligatoria)
+    """
+    id_hist = int(data["id_hist_aula_est"])
+    id_aula_origen = int(data["id_aula_origen"])
+    id_aula_destino = int(data["id_aula_destino"])
+    id_estudiante = int(data["id_estudiante"])
+    fecha_fin_actual = data.get("fecha_fin_actual")
+    fecha_inicio_nueva = data.get("fecha_inicio_nueva")
+
+    if not fecha_inicio_nueva:
+        return {"error": "Debe indicar la fecha de inicio en el aula de destino."}
+
+    es_valido, msg = validar_cambio_grado(id_aula_origen, id_aula_destino)
+    if not es_valido:
+        return {"error": msg}
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # cerrar asignación actual
+        if fecha_fin_actual:
+            cur.execute("""
+                UPDATE HISTORICO_AULA_ESTUDIANTE
+                SET fecha_fin = TO_DATE(:1, 'YYYY-MM-DD')
+                WHERE id_hist_aula_est = :2
+                  AND fecha_fin IS NULL
+            """, (fecha_fin_actual, id_hist))
+        else:
+            cur.execute("""
+                UPDATE HISTORICO_AULA_ESTUDIANTE
+                SET fecha_fin = SYSDATE
+                WHERE id_hist_aula_est = :1
+                  AND fecha_fin IS NULL
+            """, (id_hist,))
+
+        if cur.rowcount == 0:
+            raise Exception("No se encontró una asignación activa para ese estudiante en esa aula.")
+
+        # insertar nueva asignación en aula destino
+        cur.execute("""
+            INSERT INTO HISTORICO_AULA_ESTUDIANTE (id_estudiante, id_aula, fecha_inicio)
+            VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'))
+        """, (id_estudiante, id_aula_destino, fecha_inicio_nueva))
+
+        conn.commit()
+        return {"msg": "Estudiante movido de aula respetando el historial."}
     finally:
         cur.close()
         conn.close()
@@ -1089,35 +1259,53 @@ def listar_asignaciones_por_estudiante(id_estudiante):
 # ============================
 # HORARIOS POR TUTOR
 # ============================
-
 def list_horario_tutor(id_persona):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT at.id_tutor_aula, a.id_aula, a.grado, h.dia_semana, h.h_inicio, h.h_final, h.minutos_equiv, h.es_continuo, hha.fecha_inicio
-        FROM ASIGNACION_TUTOR at
-        JOIN AULA a ON at.id_aula = a.id_aula
-        JOIN HISTORICO_HORARIO_AULA hha ON a.id_aula = hha.id_aula AND hha.fecha_fin IS NULL
-        JOIN HORARIO h ON hha.id_horario = h.id_horario
-        WHERE at.id_persona = :1 AND at.fecha_fin IS NULL
-        ORDER BY h.dia_semana, h.h_inicio
-    """, (id_persona,))
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [
-        dict(
-            id_tutor_aula=r[0],
-            id_aula=r[1],
-            grado=r[2],
-            dia_semana=r[3],
-            h_inicio=r[4],
-            h_final=r[5],
-            minutos_equiv=r[6],
-            es_continuo=r[7],
-            fecha_inicio=str(r[8]) if r[8] else None  # Convierte a string (ISO) para React
-        ) for r in rows
-    ]
+    try:
+        cur.execute("""
+            SELECT 
+                at.id_tutor_aula,
+                a.id_aula,
+                a.grado,
+                h.dia_semana,
+                h.h_inicio,
+                h.h_final,
+                h.minutos_equiv,
+                h.es_continuo,
+                hha.fecha_inicio
+            FROM ASIGNACION_TUTOR at
+            JOIN TUTOR_AULA ta 
+                  ON ta.id_tutor_aula = at.id_tutor_aula
+            JOIN AULA a 
+                  ON a.id_aula = ta.id_aula
+            JOIN HISTORICO_HORARIO_AULA hha 
+                  ON a.id_aula = hha.id_aula 
+                 AND hha.fecha_fin IS NULL
+            JOIN HORARIO h 
+                  ON hha.id_horario = h.id_horario
+            WHERE at.id_persona = :1
+              AND at.fecha_fin IS NULL
+            ORDER BY h.dia_semana, h.h_inicio
+        """, (id_persona,))
+        rows = cur.fetchall()
+        return [
+            dict(
+                id_tutor_aula=r[0],
+                id_aula=r[1],
+                grado=r[2],
+                dia_semana=r[3],
+                h_inicio=r[4],
+                h_final=r[5],
+                minutos_equiv=r[6],
+                es_continuo=r[7],
+                fecha_inicio=str(r[8]) if r[8] else None,
+            )
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
 
 def listar_tutores():
     conn = get_conn()
@@ -1251,15 +1439,7 @@ def delete_estudiante(id_est):
         conn.close()
 
 
-
-
-
-
-
-
-
 # Similar wrappers can be added for Aula, Estudiante, Horario, Asignacion_Tutor, etc.
-
 
 
 
@@ -1267,56 +1447,263 @@ def delete_estudiante(id_est):
 def create_periodo(data: dict):
     conn = get_conn()
     cur = conn.cursor()
-    # Conversión robusta de fechas
-    fecha_inicio = datetime.strptime(data['fecha_inicio'], "%Y-%m-%d").date() if data['fecha_inicio'] else date.today()
-    fecha_fin = datetime.strptime(data['fecha_fin'], "%Y-%m-%d").date() if data['fecha_fin'] else date.today()
-    cur.execute(
-        "INSERT INTO PERIODO (nombre, fecha_inicio, fecha_fin) VALUES (:1, :2, :3)",
-        (data['nombre'], fecha_inicio, fecha_fin)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        fecha_inicio = datetime.strptime(data["fecha_inicio"], "%Y-%m-%d").date() if data["fecha_inicio"] else date.today()
+        fecha_fin    = datetime.strptime(data["fecha_fin"], "%Y-%m-%d").date() if data["fecha_fin"] else date.today()
+
+        cur.execute("""
+            INSERT INTO PERIODO (nombre, fecha_inicio, fecha_fin)
+            VALUES (:1, :2, :3)
+        """, (data["nombre"], fecha_inicio, fecha_fin))
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
 
 def list_periodos():
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT id_periodo, nombre, fecha_inicio, fecha_fin FROM PERIODO ORDER BY id_periodo DESC")
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [
-        dict(id_periodo=r[0], nombre=r[1], fecha_inicio=str(r[2]), fecha_fin=str(r[3]))
-        for r in rows
-    ]
+    try:
+        cur.execute("""
+            SELECT id_periodo, nombre, fecha_inicio, fecha_fin
+            FROM PERIODO
+            ORDER BY id_periodo DESC
+        """)
+        rows = cur.fetchall()
+        return [
+            dict(
+                id_periodo=r[0],
+                nombre=r[1],
+                fecha_inicio=r[2].strftime("%Y-%m-%d") if r[2] else None,
+                fecha_fin=r[3].strftime("%Y-%m-%d") if r[3] else None,
+            )
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
 
-def crear_componente(nombre: str, porcentaje: float, tipo_programa: str, id_periodo: int):
-    from .db import get_conn
+def update_periodo(id_periodo: int, data: dict):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO COMPONENTE (nombre, porcentaje, tipo_programa, id_periodo)
-        VALUES (:1, :2, :3, :4)
-    """, [nombre, porcentaje, tipo_programa, id_periodo])
-    conn.commit()
-    cur.close()
-    conn.close()
-    return {"ok": True, "msg": "Componente registrado exitosamente"}
+    try:
+        fecha_inicio = datetime.strptime(data["fecha_inicio"], "%Y-%m-%d").date()
+        fecha_fin    = datetime.strptime(data["fecha_fin"], "%Y-%m-%d").date()
+
+        cur.execute("""
+            UPDATE PERIODO
+            SET nombre = :1,
+                fecha_inicio = :2,
+                fecha_fin = :3
+            WHERE id_periodo = :4
+        """, (data["nombre"], fecha_inicio, fecha_fin, id_periodo))
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def delete_periodo(id_periodo: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # ¿tiene componentes asociados?
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM COMPONENTE
+            WHERE id_periodo = :1
+        """, (id_periodo,))
+        (count,) = cur.fetchone()
+        if count > 0:
+            raise Exception("No se puede eliminar el período porque tiene componentes asignados.")
+
+        cur.execute("DELETE FROM PERIODO WHERE id_periodo = :1", (id_periodo,))
+        if cur.rowcount == 0:
+            raise Exception("Periodo no encontrado")
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_suma_porcentajes_periodo_tipo(id_periodo: int, tipo_programa: str) -> float:
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT NVL(SUM(porcentaje), 0)
+            FROM COMPONENTE
+            WHERE id_periodo = :1
+              AND tipo_programa = :2
+        """, (id_periodo, tipo_programa))
+        (total,) = cur.fetchone()
+        return float(total)
+    finally:
+        cur.close()
+        conn.close()
+
+def crear_componente(nombre: str,
+                     porcentaje: float,
+                     tipo_programa: str,
+                     id_periodo: int):
+    if not tipo_programa:
+        return {"ok": False, "msg": "El tipo de programa es obligatorio."}
+
+    tipo_programa = tipo_programa.upper()
+    if tipo_programa not in ("INSIDECLASSROOM", "OUTSIDECLASSROOM"):
+        return {"ok": False, "msg": "Tipo de programa inválido."}
+
+    total_actual = get_suma_porcentajes_periodo_tipo(id_periodo, tipo_programa)
+    if total_actual + porcentaje > 100:
+        return {
+            "ok": False,
+            "msg": f"La suma de porcentajes para el período y tipo '{tipo_programa}' excede 100 (actual: {total_actual}%)."
+        }
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO COMPONENTE (nombre, porcentaje, tipo_programa, id_periodo)
+            VALUES (:1, :2, :3, :4)
+        """, (nombre, porcentaje, tipo_programa, id_periodo))
+        conn.commit()
+        return {"ok": True, "msg": "Componente registrado exitosamente"}
+    finally:
+        cur.close()
+        conn.close()
 
 
 def list_componentes():
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id_componente, nombre, porcentaje FROM COMPONENTE ORDER BY id_componente DESC")
+        cur.execute("""
+            SELECT 
+                c.id_componente,
+                c.nombre,
+                c.porcentaje,
+                c.tipo_programa,
+                p.nombre AS periodo_nombre,
+                c.id_periodo
+            FROM COMPONENTE c
+            LEFT JOIN PERIODO p ON c.id_periodo = p.id_periodo
+            ORDER BY c.id_componente DESC
+        """)
         rows = cur.fetchall()
         return [
-            dict(id_componente=r[0], nombre=r[1], porcentaje=r[2])
+            dict(
+                id_componente=r[0],
+                nombre=r[1],
+                porcentaje=r[2],
+                tipo_programa=r[3],
+                periodo_nombre=r[4],
+                id_periodo=r[5],
+            )
             for r in rows
         ]
     finally:
         cur.close()
         conn.close()
+
+def actualizar_componente(id_componente: int,
+                          nombre: str,
+                          porcentaje: float,
+                          tipo_programa: str,
+                          id_periodo: int):
+    if not tipo_programa:
+        return {"ok": False, "msg": "El tipo de programa es obligatorio."}
+
+    tipo_programa = tipo_programa.upper()
+    if tipo_programa not in ("INSIDECLASSROOM", "OUTSIDECLASSROOM"):
+        return {"ok": False, "msg": "Tipo de programa inválido."}
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # Obtener porcentaje actual del componente (para ese id)
+        cur.execute("""
+            SELECT porcentaje
+            FROM COMPONENTE
+            WHERE id_componente = :1
+        """, (id_componente,))
+        r = cur.fetchone()
+        if not r:
+            return {"ok": False, "msg": "Componente no encontrado."}
+        porcentaje_actual = float(r[0])
+
+        # Suma actual de ese periodo+tipo (incluyendo este componente)
+        total_actual = get_suma_porcentajes_periodo_tipo(id_periodo, tipo_programa)
+
+        # Suma sin este componente
+        total_sin_actual = total_actual - porcentaje_actual
+
+        # Validar nuevo total
+        if total_sin_actual + porcentaje > 100:
+            return {
+                "ok": False,
+                "msg": (
+                    f"La suma de porcentajes para el período y tipo '{tipo_programa}' "
+                    f"excede 100 (actual sin este componente: {total_sin_actual}%)."
+                )
+            }
+
+        # Actualizar
+        cur.execute("""
+            UPDATE COMPONENTE
+            SET nombre        = :1,
+                porcentaje    = :2,
+                tipo_programa = :3,
+                id_periodo    = :4
+            WHERE id_componente = :5
+        """, (nombre, porcentaje, tipo_programa, id_periodo, id_componente))
+        conn.commit()
+        return {"ok": True, "msg": "Componente actualizado correctamente"}
+    finally:
+        cur.close()
+        conn.close()
+
+
+
+def eliminar_componente(id_componente: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM COMPONENTE WHERE id_componente = :1", (id_componente,))
+        if cur.rowcount == 0:
+            return {"ok": False, "msg": "Componente no encontrado"}
+        conn.commit()
+        return {"ok": True, "msg": "Componente eliminado correctamente"}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_componente(id_componente: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id_componente, nombre, porcentaje, tipo_programa, id_periodo
+            FROM COMPONENTE
+            WHERE id_componente = :1
+        """, (id_componente,))
+        r = cur.fetchone()
+        if not r:
+            return None
+        return dict(
+            id_componente=r[0],
+            nombre=r[1],
+            porcentaje=r[2],
+            tipo_programa=r[3],
+            id_periodo=r[4],
+        )
+    finally:
+        cur.close()
+        conn.close()
+
+
 
 
 
@@ -1411,6 +1798,39 @@ def registrar_asistencia_aula(data):
     conn.close()
     return {"msg": "Asistencia registrada correctamente."}
 
+def list_horarios_aula_activos(id_aula: int):
+    """
+    Solo los horarios activos (HISTORICO_HORARIO_AULA.fecha_fin IS NULL)
+    para generar las fechas posibles de asistencia.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT
+              ho.dia_semana,
+              ho.h_inicio,
+              ho.h_final,
+              hha.fecha_inicio
+            FROM HISTORICO_HORARIO_AULA hha
+            JOIN HORARIO ho ON hha.id_horario = ho.id_horario
+            WHERE hha.id_aula = :1
+              AND hha.fecha_fin IS NULL
+        """, (id_aula,))
+        rows = cur.fetchall()
+        return [
+            {
+                "dia_semana":  r[0],
+                "h_inicio":    r[1].strftime("%H:%M") if hasattr(r[1], "strftime") else str(r[1])[:5],
+                "h_final":     r[2].strftime("%H:%M") if hasattr(r[2], "strftime") else str(r[2])[:5],
+                "fechainicio": r[3].strftime("%Y-%m-%d") if r[3] else None,
+            }
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
 def modificar_asistencia_aula(id_asist, data):
     conn = get_conn()
     cur = conn.cursor()
@@ -1455,22 +1875,136 @@ def modificar_asistencia_aula(id_asist, data):
         cur.close()
         conn.close()
 
+def registrar_asistencia_estudiante(data: dict):
+    """
+    Inserta o actualiza ASISTENCIA_ESTUDIANTE (id_asist, id_estudiante).
+    Si ya existe el registro, hace UPDATE; si no, INSERT sin usar secuencia.
+    """
+    id_asist = data["id_asist"]
+    id_estudiante = data["id_estudiante"]
+    asistio = (data.get("asistio") or "N").upper()
+    observacion = data.get("observacion")
 
-# --- Ingresar nota (ejemplo simple, ajusta según tus tablas) ---
-def ingresar_nota(data):
+    if asistio not in ("S", "N"):
+        return {"error": "Valor de 'asistio' inválido. Debe ser 'S' o 'N'."}
+
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO nota_estudiante (id_aula, id_estudiante, nota) VALUES (:1, :2, :3)",
-        (data['id_aula'], data['id_estudiante'], data['nota'])
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        # ¿ya existe esa fila?
+        cur.execute("""
+            SELECT id_asist_est
+            FROM ASISTENCIA_ESTUDIANTE
+            WHERE id_asist = :1 AND id_estudiante = :2
+        """, [id_asist, id_estudiante])
+        r = cur.fetchone()
 
+        if r:
+            # UPDATE
+            cur.execute("""
+                UPDATE ASISTENCIA_ESTUDIANTE
+                SET asistio = :1,
+                    observacion = :2
+                WHERE id_asist_est = :3
+            """, [asistio, observacion, r[0]])
+        else:
+            # INSERT sin secuencia explícita (usa IDENTITY de la tabla)
+            cur.execute("""
+                INSERT INTO ASISTENCIA_ESTUDIANTE
+                    (id_asist, id_estudiante, asistio, observacion)
+                VALUES (:1, :2, :3, :4)
+            """, [id_asist, id_estudiante, asistio, observacion])
 
-    from .db import get_conn
-from datetime import datetime
+        conn.commit()
+        return {"ok": True, "msg": "Asistencia de estudiante registrada."}
+    except Exception as e:
+        conn.rollback()
+        return {"error": str(e)}
+    finally:
+        cur.close()
+        conn.close()
+# --- Ingresar nota (ejemplo simple, ajusta según tus tablas) ---
+def registrar_o_actualizar_nota(id_estudiante: int, id_componente: int, nota: float):
+    """
+    Inserta o actualiza la nota de un estudiante para un componente.
+    La tabla NOTA_ESTUDIANTE tiene: id_nota, id_estudiante, id_componente, nota.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # ¿ya existe?
+        cur.execute("""
+            SELECT id_nota
+            FROM NOTA_ESTUDIANTE
+            WHERE id_estudiante = :1
+              AND id_componente = :2
+        """, (id_estudiante, id_componente))
+        fila = cur.fetchone()
+
+        if fila:
+            cur.execute("""
+                UPDATE NOTA_ESTUDIANTE
+                SET nota = :1
+                WHERE id_nota = :2
+            """, (nota, fila[0]))
+            msg = "Nota actualizada correctamente."
+        else:
+            cur.execute("""
+                INSERT INTO NOTA_ESTUDIANTE (id_estudiante, id_componente, nota)
+                VALUES (:1, :2, :3)
+            """, (id_estudiante, id_componente, nota))
+            msg = "Nota registrada correctamente."
+
+        conn.commit()
+        return {"ok": True, "msg": msg}
+    finally:
+        cur.close()
+        conn.close()
+
+def obtener_nota_estudiante(id_estudiante: int, id_componente: int):
+    """
+    Obtiene la nota (o None) de un estudiante para un componente.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT nota
+            FROM NOTA_ESTUDIANTE
+            WHERE id_estudiante = :1
+              AND id_componente = :2
+        """, (id_estudiante, id_componente))
+        r = cur.fetchone()
+        return {"nota": float(r[0]) if r and r[0] is not None else None}
+    finally:
+        cur.close()
+        conn.close()
+
+def listar_componentes_periodo_tipo(id_periodo: int, tipo_programa: str):
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id_componente, nombre, porcentaje, tipo_programa
+            FROM COMPONENTE
+            WHERE id_periodo = :1
+              AND tipo_programa = :2
+            ORDER BY id_componente
+        """, (id_periodo, tipo_programa))
+        rows = cur.fetchall()
+        return [
+            dict(
+                id_componente=r[0],
+                nombre=r[1],
+                porcentaje=r[2],
+                tipo_programa=r[3]
+            )
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
 
 def listar_tutores():
     conn = get_conn()
@@ -1480,6 +2014,160 @@ def listar_tutores():
     cur.close()
     conn.close()
     return datos
+
+def listar_aulas_tutor(id_persona: int):
+    """
+    Lista las aulas donde el tutor tiene asignación activa.
+    Usa la tabla intermedia TUTOR_AULA.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT DISTINCT a.id_aula, a.grado
+            FROM ASIGNACION_TUTOR at
+            JOIN TUTOR_AULA ta ON ta.id_tutor_aula = at.id_tutor_aula
+            JOIN AULA a        ON a.id_aula        = ta.id_aula
+            WHERE at.id_persona = :1
+              AND at.fecha_fin IS NULL
+            ORDER BY a.grado
+        """, (id_persona,))
+        rows = cur.fetchall()
+        return [
+            {
+                "id_aula": r[0],
+                "grado":   r[1],
+            }
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
+def listar_asistencia_estudiantes(id_asist: int):
+    """
+    Lista estudiantes del aula correspondiente a la asistencia,
+    junto con su asistencia de ese día (ASISTENCIA_ESTUDIANTE).
+    NO falla si la tabla de histórico no existe o no hay registros.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # 1) Obtener aula de la asistencia
+        cur.execute("""
+            SELECT id_aula
+            FROM ASISTENCIA_AULA
+            WHERE id_asist = :1
+        """, [id_asist])
+        r = cur.fetchone()
+        if not r:
+            return []
+        id_aula = r[0]
+
+        estudiantes = {}
+
+        # 2) Intentar leer estudiantes desde el histórico de aula-estudiante
+        try:
+            cur.execute("""
+                SELECT e.id_estudiante,
+                       e.nombres,
+                       e.apellidos
+                FROM ESTUDIANTE e
+                JOIN HISTORICO_AULA_ESTUDIANTE hae
+                  ON hae.id_estudiante = e.id_estudiante
+                WHERE hae.id_aula = :1
+                  AND (hae.fecha_fin IS NULL OR hae.fecha_fin >= TRUNC(SYSDATE))
+            """, [id_aula])
+            rows = cur.fetchall()
+        except oracledb.DatabaseError as ex:  # si la tabla no existe o nombre distinto
+            # como respaldo: todos los estudiantes actuales del aula
+            cur.execute("""
+                SELECT e.id_estudiante,
+                       e.nombres,
+                       e.apellidos
+                FROM ESTUDIANTE e
+                JOIN AULA_ESTUDIANTE ae
+                  ON ae.id_estudiante = e.id_estudiante
+                WHERE ae.id_aula = :1
+            """, [id_aula])
+            rows = cur.fetchall()
+
+        for r in rows:
+            estudiantes[r[0]] = {
+                "id_estudiante": r[0],
+                "nombres": r[1],
+                "apellidos": r[2],
+                "asistio": "N",
+                "observacion": "",
+            }
+
+        if not estudiantes:
+            return []
+
+        # 3) Cargar marcas de asistencia de ASISTENCIA_ESTUDIANTE
+        cur.execute("""
+            SELECT id_estudiante, asistio, observacion
+            FROM ASISTENCIA_ESTUDIANTE
+            WHERE id_asist = :1
+        """, [id_asist])
+        for est_id, asistio, obs in cur.fetchall():
+            if est_id in estudiantes:
+                estudiantes[est_id]["asistio"] = asistio or "N"
+                estudiantes[est_id]["observacion"] = obs or ""
+
+        return list(estudiantes.values())
+    finally:
+        cur.close()
+        conn.close()
+
+def listar_asistencia_estudiantes_todas(id_persona: int):
+    """
+    Devuelve todas las asistencias de un tutor, por estudiante y clase:
+    columnas: fecha_clase, id_aula, id_asist, id_estudiante, nombres, apellidos, asistio.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT
+                aa.fecha_clase,
+                aa.id_aula,
+                aa.id_asist,
+                e.id_estudiante,
+                e.nombres,
+                e.apellidos,
+                NVL(ae.asistio, 'N') AS asistio
+            FROM ASISTENCIA_AULA aa
+            JOIN ASIGNACION_TUTOR at
+              ON aa.id_tutor_aula = at.id_tutor_aula
+            JOIN HISTORICO_AULA_ESTUDIANTE hae
+              ON hae.id_aula = aa.id_aula
+             AND (hae.fecha_fin IS NULL OR hae.fecha_fin >= aa.fecha_clase)
+            JOIN ESTUDIANTE e
+              ON e.id_estudiante = hae.id_estudiante
+            LEFT JOIN ASISTENCIA_ESTUDIANTE ae
+              ON ae.id_asist = aa.id_asist
+             AND ae.id_estudiante = e.id_estudiante
+            WHERE at.id_persona = :1
+            ORDER BY aa.fecha_clase DESC, aa.id_aula, e.apellidos, e.nombres
+        """, [id_persona])
+        rows = cur.fetchall()
+        return [
+            {
+                "fecha_clase": r[0].strftime("%Y-%m-%d") if r[0] else None,
+                "id_aula": r[1],
+                "id_asist": r[2],
+                "id_estudiante": r[3],
+                "nombres": r[4],
+                "apellidos": r[5],
+                "asistio": r[6],
+            }
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
 
 def get_aulas_por_tutor(id_tutor):
     conn = get_conn()
@@ -1537,16 +2225,23 @@ def get_motivos_inasistencia():
 def get_id_tutor_aula(id_tutor, id_aula):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT id_tutor_aula FROM asignacion_tutor
-        WHERE id_persona = :1 AND id_aula = :2
-        AND (fecha_fin IS NULL OR fecha_fin > SYSDATE)
-        ORDER BY fecha_inicio DESC FETCH FIRST 1 ROWS ONLY
-    """, [id_tutor, id_aula])
-    r = cur.fetchone()
-    cur.close()
-    conn.close()
-    return {"id_tutor_aula": r[0] if r else None}
+    try:
+        cur.execute("""
+            SELECT at.id_tutor_aula
+            FROM ASIGNACION_TUTOR at
+            JOIN TUTOR_AULA ta ON ta.id_tutor_aula = at.id_tutor_aula
+            WHERE at.id_persona = :1
+              AND ta.id_aula   = :2
+              AND (at.fecha_fin IS NULL OR at.fecha_fin > SYSDATE)
+            ORDER BY at.fecha_inicio DESC
+            FETCH FIRST 1 ROWS ONLY
+        """, [id_tutor, id_aula])
+        r = cur.fetchone()
+        return {"id_tutor_aula": r[0] if r else None}
+    finally:
+        cur.close()
+        conn.close()
+
 
 def encontrar_horario_y_semana(id_aula, fecha_clase, hora_inicio):
     from datetime import datetime
@@ -1607,52 +2302,92 @@ def generar_calendario_semanas(anio: int):
     from .db import get_conn
     conn = get_conn()
     cur = conn.cursor()
-    # Valida duplicidad
-    cur.execute("SELECT COUNT(*) FROM SEMANA WHERE EXTRACT(YEAR FROM fecha_inicio) = :1", [anio])
+
+    # Valida duplicidad por año en cualquier parte del rango
+    cur.execute(
+        "SELECT COUNT(*) FROM SEMANA WHERE EXTRACT(YEAR FROM fecha_inicio) = :1",
+        [anio]
+    )
     si_existe = cur.fetchone()[0]
     if si_existe > 0:
         cur.close()
         conn.close()
-        return {"ok": False, "msg": f"El calendario del año {anio} ya existe. No se puede volver a crear."}
-    # Genera calendario semana por semana (lunes-domingo)
-    fecha_ini = date(anio, 1, 1)
-    fecha_fin = date(anio, 12, 31)
-    semana_ini = fecha_ini
+        return {
+            "ok": False,
+            "msg": f"El calendario del año {anio} ya existe. No se puede volver a crear."
+        }
+
+    fecha_ini_anio = date(anio, 1, 1)
+    fecha_fin_anio = date(anio, 12, 31)
+
     numero_semana = 1
-    # Ajusta para que siempre empiece en lunes
-    while semana_ini.weekday() != 0:
-        semana_ini += timedelta(days=1)
-    while semana_ini <= fecha_fin:
+
+    # -------- Semana 1: desde el 1 de enero hasta el domingo siguiente --------
+    # weekday(): 0 = lunes, 6 = domingo
+    # buscamos el próximo domingo (día 6) incluyendo el propio día si ya es domingo
+    dias_hasta_domingo = (6 - fecha_ini_anio.weekday()) % 7
+    fecha_fin_sem1 = fecha_ini_anio + timedelta(days=dias_hasta_domingo)
+
+    cur.execute("""
+        INSERT INTO SEMANA (NUMERO_SEMANA, FECHA_INICIO, FECHA_FIN)
+        VALUES (:1, TO_DATE(:2,'YYYY-MM-DD'), TO_DATE(:3,'YYYY-MM-DD'))
+    """, [
+        numero_semana,
+        fecha_ini_anio.strftime('%Y-%m-%d'),
+        fecha_fin_sem1.strftime('%Y-%m-%d')
+    ])
+
+    numero_semana += 1
+
+    # Siguiente semana empieza el lunes inmediatamente después de ese domingo
+    semana_ini = fecha_fin_sem1 + timedelta(days=1)
+
+    # -------- Resto de semanas: siempre lunes–domingo --------
+    while semana_ini <= fecha_fin_anio:
         semana_fin = semana_ini + timedelta(days=6)
-        if semana_fin > fecha_fin:
-            semana_fin = fecha_fin
-        # El orden correcto es: INICIO (menor), FIN (mayor)
+        if semana_fin > fecha_fin_anio:
+            semana_fin = fecha_fin_anio
+
         cur.execute("""
             INSERT INTO SEMANA (NUMERO_SEMANA, FECHA_INICIO, FECHA_FIN)
             VALUES (:1, TO_DATE(:2,'YYYY-MM-DD'), TO_DATE(:3,'YYYY-MM-DD'))
-        """, [numero_semana, semana_ini.strftime('%Y-%m-%d'), semana_fin.strftime('%Y-%m-%d')])
-        semana_ini += timedelta(days=7)
+        """, [
+            numero_semana,
+            semana_ini.strftime('%Y-%m-%d'),
+            semana_fin.strftime('%Y-%m-%d')
+        ])
+
         numero_semana += 1
+        semana_ini = semana_fin + timedelta(days=1)
+
     conn.commit()
     cur.close()
     conn.close()
-    return {"ok": True, "msg": f"Semanas para el año {anio} generadas exitosamente."}
+    return {
+        "ok": True,
+        "msg": f"Semanas para el año {anio} generadas exitosamente."
+    }
+
 
 def listar_semanas():
     from .db import get_conn
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT numero_semana, fecha_inicio, fecha_fin FROM SEMANA ORDER BY fecha_inicio")
+    cur.execute("""
+        SELECT numero_semana, fecha_inicio, fecha_fin
+        FROM SEMANA
+        ORDER BY fecha_inicio
+    """)
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    # Fechas a string
     return [
         {
             "numero_semana": r[0],
             "fecha_inicio": r[1].strftime('%Y-%m-%d'),
             "fecha_fin": r[2].strftime('%Y-%m-%d')
-        } for r in rows
+        }
+        for r in rows
     ]
 
 def agregar_festivo(fecha: str, descripcion: str):
@@ -1741,45 +2476,35 @@ def modificar_motivo(id_motivo, descripcion):
     return {"msg": "Motivo actualizado."}
 
 def listar_clases_tutor(id_persona: int):
-    from .db import get_conn
+    """
+    Usa ASISTENCIA_AULA + ASIGNACION_TUTOR para obtener las clases donde ese tutor pasó asistencia.
+    """
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT aa.id_asist, aa.fecha_clase, aa.id_aula, aa.id_horario, aa.id_semana
-        FROM ASISTENCIA_AULA aa
-        JOIN ASIGNACION_TUTOR at ON aa.id_tutor_aula = at.id_tutor_aula
-        WHERE at.id_persona = :1
-        ORDER BY aa.fecha_clase DESC
-    """, [id_persona])
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [
-        {
-            "id_asist": r[0],
-            "fecha_clase": r[1].strftime('%Y-%m-%d'),
-            "id_aula": r[2],
-            "id_horario": r[3],
-            "id_semana": r[4]
-        } for r in rows
-    ]
+    try:
+        cur.execute("""
+            SELECT aa.id_asist,
+                   aa.fecha_clase,
+                   aa.id_aula
+            FROM ASISTENCIA_AULA aa
+            JOIN ASIGNACION_TUTOR at
+              ON aa.id_tutor_aula = at.id_tutor_aula
+            WHERE at.id_persona = :1
+            ORDER BY aa.fecha_clase DESC, aa.id_asist DESC
+        """, [id_persona])
+        rows = cur.fetchall()
+        return [
+            {
+                "id_asist": r[0],
+                "fecha_clase": r[1].strftime("%Y-%m-%d") if r[1] else None,
+                "id_aula": r[2],
+            }
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
 
-def listar_aulas_tutor(id_persona: int):
-    """Lista aulas asignadas a un tutor"""
-    from .db import get_conn
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT DISTINCT a.id_aula, a.grado
-        FROM AULA a
-        JOIN ASIGNACION_TUTOR at ON a.id_aula = at.id_aula
-        WHERE at.id_persona = :1 AND at.fecha_fin IS NULL
-        ORDER BY a.grado
-    """, [id_persona])
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [{"id_aula": r[0], "grado": r[1]} for r in rows]
 
 
 def listar_estudiantes_aula(id_aula: int):
@@ -1829,22 +2554,6 @@ def listar_componentes_periodo(id_periodo: int):
     return [{"id_componente": r[0], "nombre": r[1], "porcentaje": r[2]} for r in rows]
 
 
-def obtener_nota_estudiante(id_estudiante: int, id_periodo: int, id_componente: int):
-    """Obtiene nota existente de un estudiante"""
-    from .db import get_conn
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT id_nota, nota
-        FROM NOTA_ESTUDIANTE
-        WHERE id_estudiante = :1 AND id_periodo = :2 AND id_componente = :3
-    """, [id_estudiante, id_periodo, id_componente])
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    if row:
-        return {"id_nota": row[0], "nota": row[1]}
-    return {"id_nota": None, "nota": None}
 
 
 def registrar_nota_estudiante(id_estudiante: int, id_periodo: int, id_componente: int, nota: float):

@@ -96,6 +96,14 @@ class HistoricoAulaEstudianteIn(BaseModel):
     id_aula: int
     fecha_inicio: Optional[date] = None  # Puede usar date.today() en el frontend si lo quieres automático
 
+class CambioEstudianteAulaIn(BaseModel):
+    id_hist_aula_est: int
+    id_aula_origen: int
+    id_aula_destino: int
+    id_estudiante: int
+    fecha_fin_actual: Optional[str] = None    # 'YYYY-MM-DD' o None
+    fecha_inicio_nueva: str       
+
 class HorarioIn(BaseModel):
     dia_semana: str
     h_inicio: str
@@ -125,7 +133,8 @@ class PeriodoIn(BaseModel):
 class ComponenteIn(BaseModel):
     nombre: str
     porcentaje: float
-    tipo_programa: Optional[str] = None  
+    tipo_programa: str
+    id_periodo: int
 
 
 class AsistenciaAulaIn(BaseModel):
@@ -145,10 +154,24 @@ class AsistenciaAulaIn(BaseModel):
     es_festivo: int
 
 
-class IngresarNotaIn(BaseModel):
-    id_aula: int
+class RegistrarNotaIn(BaseModel):
     id_estudiante: int
+    id_componente: int
     nota: float
+
+class RegistrarAsistenciaEstudianteIn(BaseModel):
+    id_asist: int
+    id_estudiante: int
+    asistio: str  # 'S' o 'N'
+    observacion: str | None = None
 
 class GenerarSemanasRequest(BaseModel):
     anio: int
+
+class CambiarTutorAulaIn(BaseModel):
+    id_aula: int
+    id_persona: int              # nuevo tutor
+    fecha_inicio: str            # inicio nuevo tutor (YYYY-MM-DD)
+    motivo_cambio: str
+    id_tutor_aula_actual: int
+    fecha_fin_actual: Optional[str] = None
