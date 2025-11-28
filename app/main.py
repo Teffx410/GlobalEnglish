@@ -1,5 +1,4 @@
 # app/main.py
-<<<<<<< HEAD
 from fastapi import FastAPI, HTTPException, Depends, Query, Body
 from app.models import InstitucionIn, InstitucionOut, PersonaIn,  UsuarioIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut, SedeIn, SedeOut, HistoricoAulaEstudianteIn, HorarioIn, HorarioOut, AsignarHorarioAulaIn, AsignarTutorAulaIn, PeriodoIn, ComponenteIn, AsistenciaAulaIn, IngresarNotaIn
 import app.crud as crud
