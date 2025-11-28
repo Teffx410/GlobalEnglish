@@ -22,10 +22,6 @@ class InstitucionOut(InstitucionIn):
 
 class SedeIn(BaseModel):
     id_institucion: int
-<<<<<<< HEAD
-=======
-    id_sede: int                       # se puede ignorar en el backend si se autogenera
->>>>>>> main
     direccion: Optional[str] = None
     es_principal: Optional[str] = 'N'
 
