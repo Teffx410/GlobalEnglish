@@ -14,7 +14,6 @@ def create_institucion(data: dict):
     conn = get_conn()
     cur = conn.cursor()
     try:
-<<<<<<< HEAD
         # Validar que el nombre no exista
         cur.execute("SELECT COUNT(*) FROM INSTITUCION WHERE LOWER(nombre_inst) = LOWER(:1)", 
                     (data['nombre_inst'],))
