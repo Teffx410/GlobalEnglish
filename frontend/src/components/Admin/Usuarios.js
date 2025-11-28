@@ -18,7 +18,6 @@ function Usuarios() {
   }, []);
 
   function cargarUsuarios() {
-<<<<<<< HEAD
     axios.get("http://localhost:8000/usuarios").then(r => setUsuarios(r.data));
   }
   function cargarPersonas() {
