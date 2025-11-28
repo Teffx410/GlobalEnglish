@@ -17,7 +17,6 @@ import MoverEstudianteAula from "./components/Admin/MoverEstudianteAula";
 import Usuarios from "./components/Admin/Usuarios";
 import Personas from "./components/Admin/Personas";
 import HorarioTutorCalendar from "./components/Admin/HorarioTutorCalendar";
-<<<<<<< HEAD
 import AdminOperarComoTutor from "./components/Admin/AdminOperarComoTutor";
 import AdminTomaAsistencia from "./components/Admin/AdminTomaAsistencia";
 import OperativoDashboard from "./components/Dashboard/OperativoDashboard";
@@ -26,26 +25,14 @@ import AdminCalendarioPorDias from "./components/Admin/AdminCalendarioPorDias";
 import AdminMotivosInasistencia from "./components/Admin/AdminMotivosInasistencia";
 import AdminIngresoNotas from "./components/Admin/AdminIngresoNotas"; // NUEVO
 
-=======
-import OperativoDashboard from "./components/Dashboard/OperativoDashboard";
-import TutorDashboard from "./components/Dashboard/TutorDashboard";
->>>>>>> main
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
 
-<<<<<<< HEAD
-
-=======
->>>>>>> main
   return (
     <Routes>
       <Route path="/" element={<Login setToken={setToken} />} />
       <Route path="/login" element={<Login setToken={setToken} />} />
-<<<<<<< HEAD
-=======
-
->>>>>>> main
       <Route path="/admin/*" element={<AdminLayout />}>
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="personas" element={<Personas />} />
@@ -62,7 +49,6 @@ function App() {
         <Route path="asignar-aula" element={<AsignarAula />} />
         <Route path="mover-estudiante" element={<MoverEstudianteAula />} />
         <Route path="horario-tutor-visual" element={<HorarioTutorCalendar />} />
-<<<<<<< HEAD
         <Route path="operar-tutor" element={<AdminOperarComoTutor />} />
         <Route path="asistencia-aula" element={<AdminTomaAsistencia />} />
         <Route path="calendario" element={<AdminCalendarioPorDias />} />
@@ -71,20 +57,9 @@ function App() {
       </Route>
       <Route path="/operativo-dashboard" element={<OperativoDashboard />} />
       <Route path="/tutor-dashboard" element={<TutorDashboard />} />
-=======
-      </Route>
-
-      <Route path="/operativo-dashboard" element={<OperativoDashboard />} />
-      <Route path="/tutor-dashboard" element={<TutorDashboard />} />
-
->>>>>>> main
       <Route path="*" element={<Login setToken={setToken} />} />
     </Routes>
   );
 }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> main
 export default App;

@@ -6,7 +6,7 @@ load_dotenv()
 
 USER = os.getenv("DB_USER", "GLOBALENGLISH")
 PASSWORD = os.getenv("DB_PASS", "oracle")
-DSN = os.getenv("DB_DSN", "localhost:1522/XEPDB1")
+DSN = os.getenv("DB_DSN", "localhost:1521/XEPDB1")
 
 print("Conexión:", USER, PASSWORD, DSN)
 
