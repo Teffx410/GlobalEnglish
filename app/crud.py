@@ -4,7 +4,7 @@ from app.db import get_conn
 import oracledb
 import secrets
 from datetime import date, datetime, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 
 # ============================
 # INSTITUCION
@@ -437,52 +437,84 @@ def create_aula(data: dict):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("""INSERT INTO AULA(id_institucion, id_sede, grado)
-                       VALUES (:1, :2, :3)""",
-                    (data['id_institucion'], data['id_sede'], data['grado']))
+        cur.execute("""
+            INSERT INTO AULA (id_institucion, id_sede, grado, id_tutor_aula)
+            VALUES (:1, :2, :3, NULL)
+        """, (data['id_institucion'], data['id_sede'], data['grado']))
         conn.commit()
-        cur.execute("SELECT id_aula FROM AULA WHERE id_institucion=:1 AND id_sede=:2 AND grado=:3 ORDER BY id_aula DESC",
-                    (data['id_institucion'], data['id_sede'], data['grado']))
+
+        cur.execute("""
+            SELECT id_aula FROM AULA
+            WHERE id_institucion=:1 AND id_sede=:2 AND grado=:3
+            ORDER BY id_aula DESC
+        """, (data['id_institucion'], data['id_sede'], data['grado']))
         r = cur.fetchone()
         return r[0] if r else None
     finally:
         cur.close()
         conn.close()
 
+
 def list_aulas(limit=100):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id_aula, id_institucion, id_sede, grado FROM AULA ORDER BY id_aula")
+        cur.execute("""
+            SELECT id_aula, id_institucion, id_sede, grado, id_tutor_aula
+            FROM AULA
+            ORDER BY id_aula
+        """)
         rows = cur.fetchmany(numRows=limit)
-        return [dict(id_aula=r[0], id_institucion=r[1], id_sede=r[2], grado=r[3]) for r in rows]
+        return [
+            dict(
+                id_aula=r[0],
+                id_institucion=r[1],
+                id_sede=r[2],
+                grado=r[3],
+                id_tutor_aula=r[4]
+            )
+            for r in rows
+        ]
     finally:
         cur.close()
         conn.close()
+
 
 def get_aula(id_aula):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id_aula, id_institucion, id_sede, grado FROM AULA WHERE id_aula = :1", (id_aula,))
+        cur.execute("""
+            SELECT id_aula, id_institucion, id_sede, grado, id_tutor_aula
+            FROM AULA
+            WHERE id_aula = :1
+        """, (id_aula,))
         r = cur.fetchone()
         if not r:
             return None
-        return dict(id_aula=r[0], id_institucion=r[1], id_sede=r[2], grado=r[3])
+        return dict(
+            id_aula=r[0],
+            id_institucion=r[1],
+            id_sede=r[2],
+            grado=r[3],
+            id_tutor_aula=r[4]
+        )
     finally:
         cur.close()
         conn.close()
+
 
 def update_aula(id_aula, data: dict):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("""UPDATE AULA SET
-                          id_institucion = :1,
-                          id_sede = :2,
-                          grado = :3
-                       WHERE id_aula = :4""",
-                    (data['id_institucion'], data['id_sede'], data['grado'], id_aula))
+        cur.execute("""
+            UPDATE AULA SET
+                id_institucion = :1,
+                id_sede        = :2,
+                grado          = :3
+            WHERE id_aula = :4
+        """, (data['id_institucion'], data['id_sede'], data['grado'], id_aula))
         conn.commit()
     finally:
         cur.close()
@@ -822,63 +854,137 @@ def list_horarios_aula(id_aula):
 # ASIGNACIÓN TUTOR AULA
 # ============================
 
-def asignar_tutor_aula(data):
-    id_persona = data['id_persona']
-    id_aula = data['id_aula']
-    fecha_inicio = data['fecha_inicio']
-    motivo = data.get('motivo_cambio', None)
+def cerrar_tutor_actual(id_aula: int):
+    """Cierra la asignación activa del tutor actual del aula"""
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            UPDATE ASIGNACION_TUTOR at
+            SET fecha_fin = SYSDATE
+            WHERE at.id_tutor_aula = (
+                SELECT id_tutor_aula 
+                FROM AULA 
+                WHERE id_aula = :1
+            )
+            AND at.fecha_fin IS NULL
+        """, (id_aula,))
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+def list_tutores_aula(id_aula: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT 
+                at.id_tutor_aula,
+                at.id_persona,
+                at.fecha_inicio,
+                at.fecha_fin,
+                at.motivo_cambio,
+                p.nombre,
+                p.correo
+            FROM ASIGNACION_TUTOR at
+            JOIN PERSONA p ON at.id_persona = p.id_persona
+            JOIN AULA a ON a.id_tutor_aula = at.id_tutor_aula
+            WHERE a.id_aula = :1
+            ORDER BY at.fecha_inicio DESC
+        """, (id_aula,))
+        rows = cur.fetchall()
+        return [
+            {
+                "id_tutor_aula": r[0],
+                "id_persona": r[1],
+                "fecha_inicio": r[2].strftime("%Y-%m-%d") if r[2] else None,
+                "fecha_fin": r[3].strftime("%Y-%m-%d") if r[3] else None,
+                "motivo_cambio": r[4],
+                "nombre_tutor": r[5],
+                "correo_tutor": r[6],
+            }
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
+# --- VALIDACIÓN CRUCE TUTOR ---
+
+def validar_cruce_tutor(id_persona: int, id_aula: int, fecha_inicio: str) -> tuple[bool, str]:
+    id_persona = int(id_persona)
+    id_aula = int(id_aula)
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM ASIGNACION_TUTOR at
+                 JOIN AULA a ON a.id_tutor_aula = at.id_tutor_aula
+            WHERE at.id_persona = :1
+              AND at.fecha_fin IS NULL
+              AND a.id_aula <> :2
+        """, (id_persona, id_aula))
+        (count,) = cur.fetchone()
+        if count > 0:
+            return False, "El tutor ya tiene una asignación activa en otra aula."
+        return True, ""
+    finally:
+        cur.close()
+        conn.close()
+
+# ---------- ASIGNAR TUTOR ----------
+
+def asignar_tutor_aula(data: dict):
+    id_persona = int(data["id_persona"])
+    id_aula = int(data["id_aula"])
+    fecha_inicio = str(data["fecha_inicio"])[:10]   # 'YYYY-MM-DD'
+    motivo = data.get("motivo_cambio")
 
     valido, msg = validar_cruce_tutor(id_persona, id_aula, fecha_inicio)
     if not valido:
         return {"error": msg}
 
-    # Tu código actual para cerrar tutor y asignar
-    cerrar_tutor_actual(id_aula)
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO ASIGNACION_TUTOR (id_persona, id_aula, fecha_inicio, motivo_cambio)
-        VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), :4)
-    """, (id_persona, id_aula, fecha_inicio, motivo))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return {"msg": "Tutor asignado al aula. Se conserva el historial."}
+    try:
+        # Cerrar tutor actual del aula (si lo hay)
+        cur.execute("""
+            UPDATE ASIGNACION_TUTOR at
+            SET fecha_fin = SYSDATE
+            WHERE at.id_tutor_aula = (
+                SELECT id_tutor_aula FROM AULA WHERE id_aula = :1
+            )
+              AND at.fecha_fin IS NULL
+        """, (id_aula,))
 
+        # Insertar nueva asignación
+        new_id = cur.var(oracledb.NUMBER)
+        cur.execute("""
+            INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, motivo_cambio)
+            VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), :3)
+            RETURNING id_tutor_aula INTO :4
+        """, (id_persona, fecha_inicio, motivo, new_id))
 
-def cerrar_tutor_actual(id_aula):
-    from datetime import date
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE ASIGNACION_TUTOR SET fecha_fin = :1
-        WHERE id_aula = :2 AND fecha_fin IS NULL
-        """, (date.today(), id_aula))
-    conn.commit()
-    cur.close()
-    conn.close()
+        id_tutor_aula = int(new_id.getvalue()[0])
 
-def list_tutores_aula(id_aula):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT a.id_tutor_aula, a.id_persona, a.fecha_inicio, a.fecha_fin, a.motivo_cambio, p.nombre, p.correo
-        FROM ASIGNACION_TUTOR a
-        JOIN PERSONA p ON a.id_persona = p.id_persona
-        WHERE a.id_aula = :1
-        ORDER BY a.fecha_inicio DESC
-    """, (id_aula,))
-    rows = cur.fetchall()
-    result = [
-        dict(
-            id_tutor_aula=r[0], id_persona=r[1], fecha_inicio=str(r[2]),
-            fecha_fin=str(r[3]) if r[3] else None,
-            motivo_cambio=r[4], nombre_tutor=r[5], correo_tutor=r[6]
-        ) for r in rows
-    ]
-    cur.close()
-    conn.close()
-    return result
+        # Actualizar AULA con el nuevo tutor
+        cur.execute("""
+            UPDATE AULA
+            SET id_tutor_aula = :1
+            WHERE id_aula = :2
+        """, (id_tutor_aula, id_aula))
+
+        conn.commit()
+        return {
+            "msg": "Tutor asignado al aula. Se conserva el historial.",
+            "id_tutor_aula": id_tutor_aula
+        }
+    finally:
+        cur.close()
+        conn.close()
 
 def finalizar_asignacion_tutor(id_tutor_aula: int, fecha_fin: Optional[str] = None):
     """
@@ -1417,39 +1523,6 @@ def get_horarios_aula(id_aula):
 
 
 
-def get_asignaciones_activas(id_persona, fecha_inicio):
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT at.id_aula
-        FROM ASIGNACION_TUTOR at
-        WHERE at.id_persona = :1
-        AND (at.fecha_fin IS NULL OR at.fecha_fin > TO_DATE(:2, 'YYYY-MM-DD'))
-        AND at.fecha_inicio <= TO_DATE(:3, 'YYYY-MM-DD')
-    """, (id_persona, fecha_inicio, fecha_inicio))
-    asignaciones = [r[0] for r in cur.fetchall()]
-    cur.close()
-    conn.close()
-    return asignaciones
-
-
-def validar_cruce_tutor(id_persona, id_aula, fecha_inicio):
-    horarios_nueva = get_horarios_aula(id_aula)
-    otras_aulas = get_asignaciones_activas(id_persona, fecha_inicio)
-    for aula_id in otras_aulas:
-        if aula_id == id_aula:
-            continue
-        horarios_exist = get_horarios_aula(aula_id)
-        for h_nueva in horarios_nueva:
-            for h_exist in horarios_exist:
-                if h_nueva['dia_semana'] == h_exist['dia_semana']:
-                    ini_nueva = hora_a_minutos(h_nueva['h_inicio'])
-                    fin_nueva = hora_a_minutos(h_nueva['h_final'])
-                    ini_exist = hora_a_minutos(h_exist['h_inicio'])
-                    fin_exist = hora_a_minutos(h_exist['h_final'])
-                    if ini_nueva < fin_exist and fin_nueva > ini_exist:
-                        return False, f"Cruce con aula {aula_id} en {h_nueva['dia_semana']} {h_nueva['h_inicio']}-{h_nueva['h_final']}"
-    return True, "OK"
 
 
 def get_motivos_inasistencia():

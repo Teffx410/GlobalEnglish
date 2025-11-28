@@ -61,7 +61,7 @@ CREATE TABLE AULA (
   id_institucion    NUMBER NOT NULL,
   id_sede           NUMBER NOT NULL,
   grado             VARCHAR2(10) NOT NULL,
-  id_tutor_aula     NUMBER NOT NULL,
+  id_tutor_aula     NUMBER,
   CONSTRAINT fk_aula_sede FOREIGN KEY (id_institucion, id_sede) REFERENCES SEDE(id_institucion, id_sede),
   CONSTRAINT fk_aula_tutor FOREIGN KEY (id_tutor_aula) REFERENCES SEDE(ASIGNACION_TUTOR)
 );

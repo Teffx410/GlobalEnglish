@@ -442,12 +442,6 @@ def finalizar_historial(id_hist_horario: int, fecha_fin: Optional[str] = Query(N
 # ASIGNAR TUTOR A AULA + HISTÓRICO
 # ============================
 
-@app.post("/asignar-tutor-aula")
-def asignar_tutor_aula(payload: AsignarTutorAulaIn):
-    result = crud.asignar_tutor_aula(payload.dict())
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
 
 @app.put("/asignacion-tutor/{id_tutor_aula}/fin")
 def finalizar_asignacion_tutor_endpoint(
@@ -472,9 +466,19 @@ def delete_asignacion_tutor_endpoint(id_tutor_aula: int):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
+@app.post("/asignar-tutor-aula")
+def asignar_tutor_aula(payload: AsignarTutorAulaIn):
+    result = crud.asignar_tutor_aula(payload.dict())
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
 @app.get("/historial-tutores-aula/{id_aula}")
 def historial_tutores_aula(id_aula: int):
     return crud.list_tutores_aula(id_aula)
+
+
+
 
 # ============================
 # HORARIOS TUTOR
