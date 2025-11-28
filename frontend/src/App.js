@@ -17,14 +17,13 @@ import MoverEstudianteAula from "./components/Admin/MoverEstudianteAula";
 import Usuarios from "./components/Admin/Usuarios";
 import Personas from "./components/Admin/Personas";
 import HorarioTutorCalendar from "./components/Admin/HorarioTutorCalendar";
-import AdminOperarComoTutor from "./components/Admin/AdminOperarComoTutor";
+import TomaDeAsistenciaEstudiante from "./components/Admin/TomaDeAsistenciaEstudiante";
 import AdminTomaAsistencia from "./components/Admin/AdminTomaAsistencia";
 import OperativoDashboard from "./components/Dashboard/OperativoDashboard";
 import TutorDashboard from "./components/Dashboard/TutorDashboard";
 import AdminCalendarioPorDias from "./components/Admin/AdminCalendarioPorDias";
 import AdminMotivosInasistencia from "./components/Admin/AdminMotivosInasistencia";
-import AdminIngresoNotas from "./components/Admin/AdminIngresoNotas"; // NUEVO
-
+import AdminIngresoNotas from "./components/Admin/AdminIngresoNotas";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
@@ -47,13 +46,12 @@ function App() {
         <Route path="componentes" element={<Componentes />} />
         <Route path="estudiantes" element={<Estudiantes />} />
         <Route path="asignar-aula" element={<AsignarAula />} />
-        <Route path="mover-estudiante" element={<MoverEstudianteAula />} />
         <Route path="horario-tutor-visual" element={<HorarioTutorCalendar />} />
-        <Route path="operar-tutor" element={<AdminOperarComoTutor />} />
+        <Route path="toma-asistencia-estudiante" element={<TomaDeAsistenciaEstudiante />} />
         <Route path="asistencia-aula" element={<AdminTomaAsistencia />} />
         <Route path="calendario" element={<AdminCalendarioPorDias />} />
         <Route path="motivos-inasistencia" element={<AdminMotivosInasistencia />} />
-        <Route path="ingreso-notas" element={<AdminIngresoNotas />} /> {/* NUEVO */}
+        <Route path="ingreso-notas" element={<AdminIngresoNotas />} />
       </Route>
       <Route path="/operativo-dashboard" element={<OperativoDashboard />} />
       <Route path="/tutor-dashboard" element={<TutorDashboard />} />

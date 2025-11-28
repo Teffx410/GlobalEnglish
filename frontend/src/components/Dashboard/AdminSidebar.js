@@ -107,11 +107,7 @@ function AdminSidebar() {
               <MdSchool size={22} /> Asignar Aula
             </Link>
           </li>
-          <li>
-            <Link className={`sidebar-link${isActive("/admin/mover-estudiante") ? " active" : ""}`} to="/admin/mover-estudiante">
-              <MdSchool size={22} /> Mover Estudiante
-            </Link>
-          </li>
+          
           <li>
             <Link className={`sidebar-link${isActive("/admin/calendario") ? " active" : ""}`} to="/admin/calendario">
               <BsCalendar size={22} /> Calendario
@@ -138,18 +134,20 @@ function AdminSidebar() {
             </Link>
           </li>
           <li>
-            <Link className={`sidebar-link${isActive("/admin/operar-tutor") ? " active" : ""}`} to="/admin/operar-tutor">
-              <FaChalkboardTeacher size={22} /> Operar como Tutor
+            <Link className={`sidebar-link${isActive("/admin/toma-asistencia-estudiante") ? " active" : ""}`} to="/admin/toma-asistencia-estudiante">
+              <FaChalkboardTeacher size={22} /> Toma Asistencia Estudiante
             </Link>
           </li>
           <li>
             <Link className={`sidebar-link${isActive("/admin/asistencia-aula") ? " active" : ""}`} to="/admin/asistencia-aula">
-              <FaClipboardCheck size={22} /> Toma de Asistencia
+              <FaClipboardCheck size={22} /> Toma de Asistencia Aula
             </Link>
           </li>
         </ul>
       </nav>
-      <button className="sidebar-logout" onClick={handleLogout}>Cerrar Sesión</button>
+      <button className="sidebar-logout" onClick={handleLogout}>
+        Cerrar Sesión
+      </button>
     </aside>
   );
 }

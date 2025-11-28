@@ -1,21 +1,20 @@
-// src/components/AdminOperarComoTutor.js
+// src/components/TomaDeAsistenciaEstudiante.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 const BASE = "http://localhost:8000";
 
-function AdminOperarComoTutor() {
+function TomaDeAsistenciaEstudiante() {
   const [tutores, setTutores] = useState([]);
-  const [clases, setClases] = useState([]);             // Clases del tutor
+  const [clases, setClases] = useState([]);
   const [tutorSel, setTutorSel] = useState("");
-  const [tabActiva, setTabActiva] = useState("TODAS");  // 'TODAS' o id_asist
-  const [estudiantes, setEstudiantes] = useState([]);   // Estudiantes de la clase activa
-  const [marcas, setMarcas] = useState({});             // {id_estudiante: 'S'|'N'}
-  const [historialPlano, setHistorialPlano] = useState([]); // Todas las asistencias (filas planas)
+  const [tabActiva, setTabActiva] = useState("TODAS");
+  const [estudiantes, setEstudiantes] = useState([]);
+  const [marcas, setMarcas] = useState({});
+  const [historialPlano, setHistorialPlano] = useState([]);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Cargar tutores al inicio
   useEffect(() => {
     axios
       .get(`${BASE}/admin/listar-tutores`)
@@ -23,7 +22,6 @@ function AdminOperarComoTutor() {
       .catch(() => setMsg("Error al cargar tutores."));
   }, []);
 
-  // Cargar clases del tutor y el historial plano
   const cargarClases = async id_persona => {
     setClases([]);
     setTabActiva("TODAS");
@@ -50,7 +48,6 @@ function AdminOperarComoTutor() {
     }
   };
 
-  // Cargar estudiantes de una clase específica
   const cargarEstudiantes = async id_asist => {
     setEstudiantes([]);
     setMarcas({});
@@ -107,10 +104,8 @@ function AdminOperarComoTutor() {
 
       setMsg("Asistencia de todos los estudiantes guardada correctamente.");
 
-      // refrescar clase actual
       await cargarEstudiantes(tabActiva);
 
-      // refrescar resumen "Todas las asistencias"
       if (tutorSel) {
         const rHist = await axios.get(
           `${BASE}/admin/listar-asistencia-estudiantes-todas`,
@@ -126,7 +121,6 @@ function AdminOperarComoTutor() {
     setLoading(false);
   };
 
-  // Construir matriz estudiante x clase para la vista "TODAS"
   const clasesOrdenadas = [...clases].sort((a, b) =>
     String(a.fecha_clase).localeCompare(String(b.fecha_clase))
   );
@@ -136,7 +130,6 @@ function AdminOperarComoTutor() {
     mapaClasesPorId[c.id_asist] = { index: idx, ...c };
   });
 
-  // {id_estudiante: {infoEst, asistencias: ['S'|'N'|''] por columna}}
   const resumenPorEstudiante = {};
   if (tabActiva === "TODAS" && historialPlano.length > 0) {
     historialPlano.forEach(r => {
@@ -174,9 +167,8 @@ function AdminOperarComoTutor() {
 
   return (
     <div className="aulas-panel" style={{ maxWidth: "100%", margin: "24px 20px" }}>
-      <h2 style={{ marginBottom: 18 }}>Asistencia por tutor (estudiantes)</h2>
+      <h2 style={{ marginBottom: 18 }}>Toma de asistencia (estudiantes)</h2>
 
-      {/* Selector de tutor */}
       <div
         style={{
           display: "flex",
@@ -208,7 +200,6 @@ function AdminOperarComoTutor() {
         </label>
       </div>
 
-      {/* Pestañas de clases */}
       {clases.length > 0 && (
         <div
           style={{
@@ -269,7 +260,6 @@ function AdminOperarComoTutor() {
         </div>
       )}
 
-      {/* Vista "Todas las asistencias": matriz estudiantes x clases, solo lectura */}
       {tabActiva === "TODAS" && filasResumen.length > 0 && (
         <div className="table-responsive">
           <table className="aulas-table">
@@ -301,7 +291,6 @@ function AdminOperarComoTutor() {
         </div>
       )}
 
-      {/* Vista de pestaña de una clase específica: editable */}
       {tabActiva !== "TODAS" && estudiantes.length > 0 && (
         <>
           <div style={{ textAlign: "right", marginBottom: 10 }}>
@@ -392,4 +381,4 @@ function AdminOperarComoTutor() {
   );
 }
 
-export default AdminOperarComoTutor;
+export default TomaDeAsistenciaEstudiante;

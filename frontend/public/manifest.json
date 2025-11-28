@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
   "short_name": "React App",
-=======
-  "short_name": "BES",
->>>>>>> main
   "name": "Create React App Sample",
   "icons": [
     {
