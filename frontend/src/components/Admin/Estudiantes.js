@@ -38,18 +38,12 @@ function Estudiantes() {
   function handleFormChange(e) {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
-<<<<<<< HEAD
     setError("");
-=======
->>>>>>> main
   }
 
   function agregarEstudiante(e) {
     e.preventDefault();
-<<<<<<< HEAD
     setError("");
-=======
->>>>>>> main
     if (!form.num_documento || !form.nombres) {
       setError("Documento y nombres son obligatorios");
       return;
@@ -68,7 +62,6 @@ function Estudiantes() {
         setError("");
         cargarEstudiantes();
       })
-<<<<<<< HEAD
       .catch(err => {
         if (err.response && err.response.data && err.response.data.detail) {
           setError(err.response.data.detail);
@@ -76,9 +69,6 @@ function Estudiantes() {
           setError("No se pudo agregar el estudiante");
         }
       });
-=======
-      .catch(() => setError("No se pudo agregar el estudiante"));
->>>>>>> main
   }
 
   function eliminarEstudiante(id) {
@@ -89,31 +79,21 @@ function Estudiantes() {
 
   function activarEdicion(est) {
     setEditId(est.id_estudiante);
-<<<<<<< HEAD
     setEditForm({
       ...est,
       fecha_nacimiento: est.fecha_nacimiento ? est.fecha_nacimiento.slice(0, 10) : ""
     });
     setError("");
-=======
-    setEditForm({ ...est });
->>>>>>> main
   }
 
   function handleEditChange(e) {
     const { name, value } = e.target;
     setEditForm({ ...editForm, [name]: value });
-<<<<<<< HEAD
     setError("");
   }
 
   function guardarEdicion(id) {
     setError("");
-=======
-  }
-
-  function guardarEdicion(id) {
->>>>>>> main
     axios.put(`http://localhost:8000/estudiantes/${id}`, editForm)
       .then(() => {
         setEditId(null);
@@ -128,7 +108,6 @@ function Estudiantes() {
         });
         cargarEstudiantes();
       })
-<<<<<<< HEAD
       .catch(err => {
         if (err.response && err.response.data && err.response.data.detail) {
           setError(err.response.data.detail);
@@ -136,9 +115,6 @@ function Estudiantes() {
           setError("No se pudo editar el estudiante");
         }
       });
-=======
-      .catch(() => setError("No se pudo editar el estudiante"));
->>>>>>> main
   }
 
   function cancelarEdicion() {
@@ -152,10 +128,7 @@ function Estudiantes() {
       fecha_nacimiento: "",
       correo: ""
     });
-<<<<<<< HEAD
     setError("");
-=======
->>>>>>> main
   }
 
   return (
