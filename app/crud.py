@@ -35,7 +35,6 @@ def create_institucion(data: dict):
         cur.close()
         conn.close()
 
-
 def list_instituciones(limit=100):
     """Lista todas las instituciones"""
     conn = get_conn()
@@ -60,7 +59,6 @@ def list_instituciones(limit=100):
         cur.close()
         conn.close()
 
-
 def get_institucion(id_inst):
     """Obtiene una institución por ID"""
     conn = get_conn()
@@ -81,7 +79,6 @@ def get_institucion(id_inst):
         cur.close()
         conn.close()
 
-
 def delete_institucion(id_inst):
     """Elimina una institución si no tiene sedes asociadas"""
     conn = get_conn()
@@ -100,7 +97,6 @@ def delete_institucion(id_inst):
     finally:
         cur.close()
         conn.close()
-
 
 def update_institucion(id_inst, data: dict):
     """Actualiza una institución validando nombre único"""
@@ -131,6 +127,7 @@ def update_institucion(id_inst, data: dict):
 # ============================
 # SEDE
 # ============================
+
 def create_sede(data: dict):
     """Crea una sede validando que la dirección sea única"""
     conn = get_conn()
@@ -159,7 +156,6 @@ def create_sede(data: dict):
         cur.close()
         conn.close()
 
-
 def list_sedes(limit=100):
     """Lista todas las sedes"""
     conn = get_conn()
@@ -171,7 +167,6 @@ def list_sedes(limit=100):
     finally:
         cur.close()
         conn.close()
-
 
 def get_sede(id_sede):
     """Obtiene una sede por ID"""
@@ -227,7 +222,6 @@ def delete_sede(id_institucion, id_sede):
         cur.close()
         conn.close()
 
-
 def update_sede(id_sede, data: dict):
     """Actualiza una sede validando dirección única"""
     conn = get_conn()
@@ -257,6 +251,7 @@ def update_sede(id_sede, data: dict):
 # ============================
 # PERSONA
 # ============================
+
 def create_persona(data: dict):
     conn = get_conn()
     cur = conn.cursor()
@@ -300,7 +295,6 @@ def create_persona(data: dict):
     finally:
         cur.close()
         conn.close()
-
 
 def list_personas(limit=100):
     conn = get_conn()
@@ -365,7 +359,6 @@ def update_persona(id_persona: int, data: dict):
     finally:
         cur.close()
         conn.close()
-
 
 def delete_persona(id_persona: int):
     conn = get_conn()
@@ -482,7 +475,6 @@ def list_aulas(limit: int = 100):
         cur.close()
         conn.close()
 
-
 def get_aula(id_aula: int):
     conn = get_conn()
     cur = conn.cursor()
@@ -505,7 +497,6 @@ def get_aula(id_aula: int):
         cur.close()
         conn.close()
 
-
 def update_aula(id_aula: int, data: dict):
     conn = get_conn()
     cur = conn.cursor()
@@ -522,7 +513,6 @@ def update_aula(id_aula: int, data: dict):
         cur.close()
         conn.close()
 
-
 def delete_aula(id_aula: int):
     conn = get_conn()
     cur = conn.cursor()
@@ -534,7 +524,6 @@ def delete_aula(id_aula: int):
     finally:
         cur.close()
         conn.close()
-
 
 # ============================
 # HORARIOS
@@ -1132,7 +1121,6 @@ def asignar_estudiante_aula(data):
     conn.close()
     return {"msg": "Estudiante asignado correctamente"}
 
-
 def listar_estudiantes_de_aula(id_aula: int):
     conn = get_conn()
     cur = conn.cursor()
@@ -1195,7 +1183,6 @@ def finalizar_asignacion_estudiante(id_hist_aula_est: int, fecha_fin: str | None
     finally:
         cur.close()
         conn.close()
-
 
 def cambiar_estudiante_aula(data: dict):
     """
@@ -1360,7 +1347,6 @@ def get_id_tutor_aula(id_tutor, id_aula):
     finally:
         cur.close()
         conn.close()
-
 
 def encontrar_horario_y_semana(id_aula, fecha_clase, hora_inicio):
     from datetime import datetime
@@ -2198,7 +2184,6 @@ def listar_estudiantes_aula(id_aula: int):
     conn.close()
     return [{"id_estudiante": r[0], "nombres": r[1], "apellidos": r[2]} for r in rows]
 
-
 def listar_periodos():
     """Lista todos los períodos"""
     from .db import get_conn
@@ -2534,4 +2519,379 @@ def get_motivos_inasistencia():
     cur.close()
     conn.close()
     return datos
+
+# ============================
+# REPORTES
+# ============================
+
+def reporte_asistencia_tutor(id_persona: int, fecha_inicio: str, fecha_fin: str):
+    """
+    Reporte de asistencia de un tutor entre dos fechas.
+    Usa ASISTENCIA_AULA + ASIGNACION_TUTOR + AULA + HORARIO.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT
+                aa.fecha_clase,
+                a.id_aula,
+                a.grado,
+                h.dia_semana,
+                aa.hora_inicio,
+                aa.hora_fin,
+                aa.dictada,
+                aa.horas_dictadas,
+                aa.reposicion,
+                aa.fecha_reposicion
+            FROM ASISTENCIA_AULA aa
+            JOIN ASIGNACION_TUTOR at
+              ON aa.id_tutor_aula = at.id_tutor_aula
+            JOIN AULA a
+              ON aa.id_aula = a.id_aula
+            JOIN HORARIO h
+              ON aa.id_horario = h.id_horario
+            WHERE at.id_persona = :1
+              AND aa.fecha_clase BETWEEN TO_DATE(:2, 'YYYY-MM-DD')
+                                      AND TO_DATE(:3, 'YYYY-MM-DD')
+            ORDER BY aa.fecha_clase, aa.hora_inicio
+        """, [id_persona, fecha_inicio, fecha_fin])
+
+        rows = cur.fetchall()
+        return [
+            {
+                "fecha_clase": r[0].strftime("%Y-%m-%d") if r[0] else None,
+                "id_aula": r[1],
+                "grado": r[2],
+                "dia_semana": r[3],
+                "hora_inicio": str(r[4]) if r[4] else None,
+                "hora_fin": str(r[5]) if r[5] else None,
+                "dictada": r[6],
+                "horas_dictadas": r[7],
+                "reposicion": r[8],
+                "fecha_reposicion": r[9].strftime("%Y-%m-%d") if r[9] else None,
+            }
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
+def actualizar_score_estudiante(id_estudiante: int,
+                                score_entrada: float | None,
+                                score_salida: float | None):
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            UPDATE ESTUDIANTE
+               SET score_entrada = :1,
+                   score_salida  = :2
+             WHERE id_estudiante = :3
+        """, [score_entrada, score_salida, id_estudiante])
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return {"error": str(e)}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def obtener_score_estudiante(id_estudiante: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT score_entrada, score_salida
+              FROM ESTUDIANTE
+             WHERE id_estudiante = :1
+        """, [id_estudiante])
+        r = cur.fetchone()
+        if not r:
+            return {}
+        return {
+            "score_entrada": r[0],
+            "score_salida": r[1],
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+def listar_estudiantes_admin():
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT
+                id_estudiante,
+                nombres,
+                apellidos,
+                score_entrada,
+                score_salida
+            FROM ESTUDIANTE
+            ORDER BY apellidos, nombres
+        """)
+        rows = cur.fetchall()
+        return [
+            {
+                "id_estudiante": r[0],
+                "nombres": r[1],
+                "apellidos": r[2],
+                "score_entrada": r[3],
+                "score_salida": r[4],
+            }
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
+def reporte_autogestion_tutor(id_persona: int, fecha_inicio: str, fecha_fin: str):
+    """
+    Reporte de autogestión del tutor: asistencia por clase en un rango de fechas.
+    La parte de notas se maneja en otra pestaña.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # 1) Resumen de asistencia por día/clase
+        cur.execute("""
+            SELECT
+                aa.fecha_clase,
+                a.id_aula,
+                a.grado,
+                aa.hora_inicio,
+                aa.hora_fin,
+                aa.dictada,
+                aa.horas_dictadas,
+                NVL(ROUND(
+                    (SELECT COUNT(*)
+                       FROM ASISTENCIA_ESTUDIANTE ae
+                      WHERE ae.id_asist = aa.id_asist
+                        AND ae.asistio = 'S')
+                    /
+                    NULLIF( (SELECT COUNT(*)
+                               FROM ASISTENCIA_ESTUDIANTE ae2
+                              WHERE ae2.id_asist = aa.id_asist), 0)
+                    * 100, 1
+                ), 0) AS pct_asistencia
+            FROM ASISTENCIA_AULA aa
+            JOIN ASIGNACION_TUTOR at
+              ON aa.id_tutor_aula = at.id_tutor_aula
+            JOIN AULA a
+              ON aa.id_aula = a.id_aula
+            WHERE at.id_persona = :1
+              AND aa.fecha_clase BETWEEN TO_DATE(:2,'YYYY-MM-DD')
+                                      AND TO_DATE(:3,'YYYY-MM-DD')
+            ORDER BY aa.fecha_clase, aa.hora_inicio
+        """, [id_persona, fecha_inicio, fecha_fin])
+
+        asis_rows = cur.fetchall()
+        asistencia = [
+            {
+                "fecha_clase": r[0].strftime("%Y-%m-%d") if r[0] else None,
+                "id_aula": r[1],
+                "grado": r[2],
+                "hora_inicio": str(r[3]) if r[3] else None,
+                "hora_fin": str(r[4]) if r[4] else None,
+                "dictada": r[5],
+                "horas_dictadas": r[6],
+                "pct_asistencia": float(r[7]) if r[7] is not None else 0.0,
+            }
+            for r in asis_rows
+        ]
+
+        # Notas no se devuelven aquí (se manejan en otra pestaña)
+        return {"asistencia": asistencia, "notas": []}
+    finally:
+        cur.close()
+        conn.close()
+
+def resolver_tipo_programa_por_grado(grado: str) -> str:
+    """
+    Dado el grado del aula, devuelve INSIDECLASSROOM u OUTSIDECLASSROOM.
+    AJUSTA LOS CONDICIONALES A CÓMO NOMBRAS TUS GRADOS.
+    """
+    if not grado:
+        return ""
+
+    g = grado.upper()
+
+    # Ejemplos: si el texto del grado contiene estas palabras
+    if "OUTSIDE" in g:
+        return "OUTSIDECLASSROOM"
+    # Por defecto, considerar que es INSIDECLASSROOM
+    return "INSIDECLASSROOM"
+
+
+def reporte_notas_tutor_periodo(id_persona: int, id_periodo: int, id_aula: int):
+    """
+    Reporte de notas por periodo para un tutor, un aula y un periodo específicos.
+
+    - Solo lectura.
+    - Determina tipo_programa (INSIDECLASSROOM/OUTSIDECLASSROOM) a partir del grado del aula.
+    - Solo incluye componentes del periodo cuyo tipo_programa coincide con el del aula.
+    - Calcula la definitiva por estudiante como sumatoria de (nota * porcentaje/100).
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # 0) Obtener grado del aula y tipo_programa asociado
+        cur.execute("""
+            SELECT grado
+            FROM AULA
+            WHERE id_aula = :1
+        """, [id_aula])
+        r_aula = cur.fetchone()
+        if not r_aula:
+            return []
+
+        grado_aula = r_aula[0]
+        tipo_prog_aula = resolver_tipo_programa_por_grado(grado_aula)
+
+        # 1) Componentes del periodo que aplican al tipo de programa del aula
+        cur.execute("""
+            SELECT id_componente, nombre, porcentaje
+            FROM COMPONENTE
+            WHERE id_periodo = :1
+              AND tipo_programa = :2
+            ORDER BY id_componente
+        """, [id_periodo, tipo_prog_aula])
+        comp_rows = cur.fetchall()
+        if not comp_rows:
+            return []
+
+        componentes = [
+            {
+                "id_componente": r[0],
+                "nombre": r[1],
+                "porcentaje": float(r[2]) if r[2] is not None else 0.0,
+            }
+            for r in comp_rows
+        ]
+
+        # 2) Estudiantes del aula (histórico vigente)
+        cur.execute("""
+            SELECT DISTINCT
+                   e.id_estudiante,
+                   e.nombres,
+                   e.apellidos
+            FROM HISTORICO_AULA_ESTUDIANTE hae
+            JOIN ESTUDIANTE e
+              ON hae.id_estudiante = e.id_estudiante
+            WHERE hae.id_aula = :1
+              AND (hae.fecha_fin IS NULL OR hae.fecha_fin >= SYSDATE)
+        """, [id_aula])
+        est_rows = cur.fetchall()
+        if not est_rows:
+            return []
+
+        estudiantes = {}
+        for r in est_rows:
+            id_est = r[0]
+            estudiantes[id_est] = {
+                "id_estudiante": id_est,
+                "nombres": r[1],
+                "apellidos": r[2],
+                "componentes": [
+                    {
+                        "id_componente": c["id_componente"],
+                        "nombre_componente": c["nombre"],
+                        "porcentaje": c["porcentaje"],
+                        "nota": None,
+                    }
+                    for c in componentes
+                ],
+                "definitiva": None,
+            }
+
+        # 3) Notas existentes para esos estudiantes y estos componentes
+        cur.execute("""
+            SELECT
+                n.id_estudiante,
+                n.id_componente,
+                n.nota
+            FROM NOTA_ESTUDIANTE n
+            JOIN COMPONENTE c
+              ON n.id_componente = c.id_componente
+            WHERE c.id_periodo = :1
+              AND c.tipo_programa = :2
+              AND n.id_estudiante IN (
+                    SELECT DISTINCT e2.id_estudiante
+                    FROM HISTORICO_AULA_ESTUDIANTE hae2
+                    JOIN ESTUDIANTE e2
+                      ON hae2.id_estudiante = e2.id_estudiante
+                    WHERE hae2.id_aula = :3
+                      AND (hae2.fecha_fin IS NULL OR hae2.fecha_fin >= SYSDATE)
+              )
+        """, [id_periodo, tipo_prog_aula, id_aula])
+        nota_rows = cur.fetchall()
+
+        for est_id, id_comp, nota in nota_rows:
+            est = estudiantes.get(est_id)
+            if not est:
+                continue
+            for comp in est["componentes"]:
+                if comp["id_componente"] == id_comp:
+                    comp["nota"] = float(nota) if nota is not None else None
+                    break
+
+        # 4) Calcular definitiva por estudiante: sum(nota * porcentaje/100)
+        for est in estudiantes.values():
+            suma = 0.0
+            for comp in est["componentes"]:
+                if comp["nota"] is not None:
+                    suma += comp["nota"] * (comp["porcentaje"] / 100.0)
+            est["definitiva"] = round(suma, 2) if suma > 0 else None
+
+        return list(estudiantes.values())
+    finally:
+        cur.close()
+        conn.close()
+
+
+
+def guardar_notas_tutor_periodo(id_persona: int, id_periodo: int, notas: list[dict]):
+    """
+    Guarda notas recibidas desde el front.
+    notas: [{id_estudiante, id_componente, nota}]
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        for item in notas:
+            id_est = item["id_estudiante"]
+            id_comp = item["id_componente"]
+            nota = item["nota"]
+
+            cur.execute("""
+                SELECT id_nota
+                  FROM NOTA_ESTUDIANTE
+                 WHERE id_estudiante = :1
+                   AND id_componente = :2
+            """, [id_est, id_comp])
+            r = cur.fetchone()
+
+            if r:
+                cur.execute("""
+                    UPDATE NOTA_ESTUDIANTE
+                       SET nota = :1
+                     WHERE id_nota = :2
+                """, [nota, r[0]])
+            else:
+                cur.execute("""
+                    INSERT INTO NOTA_ESTUDIANTE (id_estudiante, id_componente, nota)
+                    VALUES (:1, :2, :3)
+                """, [id_est, id_comp, nota])
+
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return {"error": str(e)}
+    finally:
+        cur.close()
+        conn.close()
 

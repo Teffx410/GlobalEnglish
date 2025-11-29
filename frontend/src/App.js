@@ -24,6 +24,9 @@ import TutorDashboard from "./components/Dashboard/TutorDashboard";
 import AdminCalendarioPorDias from "./components/Admin/AdminCalendarioPorDias";
 import AdminMotivosInasistencia from "./components/Admin/AdminMotivosInasistencia";
 import AdminIngresoNotas from "./components/Admin/AdminIngresoNotas";
+import AdminVerificarAsistenciaTutor from "./components/Admin/AdminVerificarAsistenciaTutor";
+import AdminScoreEstudiante from "./components/Admin/AdminScoreEstudiante";
+import AdminAutogestionTutorReporte from "./components/Admin/AdminAutogestionTutorReporte";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
@@ -32,6 +35,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Login setToken={setToken} />} />
       <Route path="/login" element={<Login setToken={setToken} />} />
+
       <Route path="/admin/*" element={<AdminLayout />}>
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="personas" element={<Personas />} />
@@ -52,7 +56,11 @@ function App() {
         <Route path="calendario" element={<AdminCalendarioPorDias />} />
         <Route path="motivos-inasistencia" element={<AdminMotivosInasistencia />} />
         <Route path="ingreso-notas" element={<AdminIngresoNotas />} />
+        <Route path="verificar-asistencia-tutor" element={<AdminVerificarAsistenciaTutor />} />
+        <Route path="score-estudiante" element={<AdminScoreEstudiante />} />
+        <Route path="reporte-autogestion-tutor" element={<AdminAutogestionTutorReporte />} />
       </Route>
+
       <Route path="/operativo-dashboard" element={<OperativoDashboard />} />
       <Route path="/tutor-dashboard" element={<TutorDashboard />} />
       <Route path="*" element={<Login setToken={setToken} />} />

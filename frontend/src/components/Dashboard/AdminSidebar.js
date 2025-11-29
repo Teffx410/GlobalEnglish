@@ -35,6 +35,7 @@ function AdminSidebar() {
           <div className="sidebar-rol">{rol}</div>
         </div>
       </div>
+
       <nav className="sidebar-nav">
         <ul>
           <li>
@@ -107,7 +108,7 @@ function AdminSidebar() {
               <MdSchool size={22} /> Asignar Aula
             </Link>
           </li>
-          
+
           <li>
             <Link className={`sidebar-link${isActive("/admin/calendario") ? " active" : ""}`} to="/admin/calendario">
               <BsCalendar size={22} /> Calendario
@@ -143,8 +144,24 @@ function AdminSidebar() {
               <FaClipboardCheck size={22} /> Toma de Asistencia Aula
             </Link>
           </li>
+          <li>
+            <Link className={`sidebar-link${isActive("/admin/verificar-asistencia-tutor") ? " active" : ""}`} to="/admin/verificar-asistencia-tutor">
+              <FaClipboardCheck size={22} /> Verificar Asistencia Tutor
+            </Link>
+          </li>
+          <li>
+            <Link className={`sidebar-link${isActive("/admin/score-estudiante") ? " active" : ""}`} to="/admin/score-estudiante">
+              <MdSchool size={22} /> Score Entrada/Salida
+            </Link>
+          </li>
+          <li>
+            <Link className={`sidebar-link${isActive("/admin/reporte-autogestion-tutor") ? " active" : ""}`} to="/admin/reporte-autogestion-tutor">
+              <FaClipboardCheck size={22} /> Rep. Autogestión Tutor
+            </Link>
+          </li>
         </ul>
       </nav>
+
       <button className="sidebar-logout" onClick={handleLogout}>
         Cerrar Sesión
       </button>

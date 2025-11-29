@@ -7,6 +7,8 @@ from app.auth import create_token, require_role
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from hashlib import sha256
+
 
 
 app = FastAPI()
@@ -216,13 +218,14 @@ def delete_persona_endpoint(id_persona: int):
 # ============================
 
 @app.post("/usuarios")
-def crear_usuario(payload: UsuarioIn):
-    nombre_user, clave, correo = crud.create_usuario(payload.dict())
+def crear_usuario(payload: dict):
+    nombre_user, clave, correo = crud.create_usuario(payload)
     return {
         "nombre_user": nombre_user,
+        "clave_generada": clave,
         "correo": correo,
-        "clave_generada": clave
     }
+
 
 @app.get("/usuarios")
 def listar_usuarios():
@@ -632,6 +635,9 @@ def listar_componentes_periodo_tipo(id_periodo: int, tipo_programa: str):
 def listar_aulas_tutor(id_persona: int = Query(...)):
     return crud.listar_aulas_tutor(id_persona)
 
+@app.get("/admin/listar-tutores")
+def listar_tutores():
+    return crud.listar_tutores()
 # ============================
 # CALENDARIO SEMANAS
 # ============================
@@ -701,33 +707,50 @@ def login(payload: LoginIn):
     try:
         conn = crud.get_conn()
         cur = conn.cursor()
-        print("Buscando correo:", repr(payload.correo))
+
+        correo_buscar = payload.correo.strip().lower()
+        print("Buscando correo:", repr(correo_buscar))
 
         cur.execute("""
             SELECT u.contrasena, p.rol, u.nombre_user
-            FROM USUARIO u JOIN PERSONA p ON u.id_persona = p.id_persona
+            FROM USUARIO u
+            JOIN PERSONA p ON u.id_persona = p.id_persona
             WHERE TRIM(LOWER(p.correo)) = TRIM(LOWER(:1))
-        """, (payload.correo.strip().lower(),))
+        """, (correo_buscar,))
 
         result = cur.fetchone()
         print("DB QUERY RESULT:", result)
-        if not result:
-            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
-        db_pass, rol, nombre_user = result
-        if db_pass != payload.contrasena:
-            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
-        token = create_token({"correo": payload.correo, "rol": rol, "nombre_user": nombre_user})
-        print("Rol encontrado en base:", rol)
 
-        # 🚩 Devuelve token, rol y nombre_user (opcional para el frontend)
+        if not result:
+            print("No se encontró usuario con ese correo")
+            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+
+        db_pass, rol, nombre_user = result
+        hash_ingresada = sha256(payload.contrasena.encode()).hexdigest()
+        print("Hash BD:      ", db_pass)
+        print("Hash ingresada:", hash_ingresada)
+
+        if db_pass != hash_ingresada:
+            print("Hashes NO coinciden")
+            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+
+        token = create_token({
+            "correo": payload.correo,
+            "rol": rol,
+            "nombre_user": nombre_user
+        })
+        print("Login OK para:", nombre_user, "rol:", rol)
+
         return {
-            "ftoken": token,       # puedes cambiar a "token" si prefieres, igual que antes
+            "ftoken": token,
             "rol": rol,
             "nombre_user": nombre_user
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        print("ERROR EN LOGIN:", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        print("ERROR EN LOGIN:", repr(e))
+        raise HTTPException(status_code=500, detail="Error al iniciar sesión")
     finally:
         try:
             cur.close()
@@ -739,6 +762,61 @@ def login(payload: LoginIn):
 # REPORTES
 # ============================
 
+@app.get("/admin/reporte-asistencia-tutor")
+def reporte_asistencia_tutor(id_persona: int, fecha_inicio: str, fecha_fin: str):
+    return crud.reporte_asistencia_tutor(id_persona, fecha_inicio, fecha_fin)
+
+@app.get("/admin/score-estudiante")
+def get_score_estudiante(id_estudiante: int):
+    return crud.obtener_score_estudiante(id_estudiante)
+
+
+@app.post("/admin/score-estudiante")
+def post_score_estudiante(
+    id_estudiante: int = Body(...),
+    score_entrada: float | None = Body(None),
+    score_salida: float | None = Body(None),
+):
+    return crud.actualizar_score_estudiante(id_estudiante, score_entrada, score_salida)
+
+@app.get("/admin/estudiantes")
+def listar_estudiantes_admin():
+    return crud.listar_estudiantes_admin()
+
 @app.get("/reportes/aula/{id_aula}/asistencia")
 def reporte_aula(id_aula: int, id_semana: int = None):
     return reports.reporte_asistencia_aula(id_aula, id_semana)
+
+@app.get("/reporte/autogestion-tutor")
+def reporte_autogestion_tutor(id_persona: int, fecha_inicio: str, fecha_fin: str):
+    return crud.reporte_autogestion_tutor(id_persona, fecha_inicio, fecha_fin)
+
+
+@app.post("/reporte/notas-tutor-periodo")
+def post_notas_tutor_periodo(payload: dict):
+    return crud.guardar_notas_tutor_periodo(
+        payload.get("id_persona"),
+        payload.get("id_periodo"),
+        payload.get("notas", []),
+    )
+
+@app.get("/admin/periodos")
+def listar_periodos_endpoint():
+    return crud.listar_periodos()
+
+@app.get("/reporte/notas-tutor-periodo")
+def get_notas_tutor_periodo(id_persona: int, id_periodo: int, id_aula: int):
+    return crud.reporte_notas_tutor_periodo(id_persona, id_periodo, id_aula)
+
+@app.post("/reporte/notas-tutor-periodo")
+def post_notas_tutor_periodo(payload: dict):
+    return crud.guardar_notas_tutor_periodo(
+        payload["id_persona"],
+        payload["id_periodo"],
+        payload["notas"],
+    )
+
+@app.get("/admin/aulas-por-tutor")
+def aulas_por_tutor(id_persona: int):
+    return crud.listar_aulas_tutor(id_persona)
+
