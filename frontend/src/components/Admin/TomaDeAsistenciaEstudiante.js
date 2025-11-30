@@ -1,13 +1,17 @@
-// src/components/TomaDeAsistenciaEstudiante.js
+// src/components/Admin/TomaDeAsistenciaEstudiante.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 const BASE = "http://localhost:8000";
 
 function TomaDeAsistenciaEstudiante() {
+  const rol = localStorage.getItem("rol");
+  const esSoloTutor = rol === "TUTOR";
+  const idPersonaSesion = localStorage.getItem("id_persona") || "";
+
   const [tutores, setTutores] = useState([]);
   const [clases, setClases] = useState([]);
-  const [tutorSel, setTutorSel] = useState("");
+  const [tutorSel, setTutorSel] = useState(esSoloTutor ? idPersonaSesion : "");
   const [tabActiva, setTabActiva] = useState("TODAS");
   const [estudiantes, setEstudiantes] = useState([]);
   const [marcas, setMarcas] = useState({});
@@ -15,12 +19,25 @@ function TomaDeAsistenciaEstudiante() {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // cargar tutores (solo admin/administrativo)
   useEffect(() => {
-    axios
-      .get(`${BASE}/admin/listar-tutores`)
-      .then(res => setTutores(res.data || []))
-      .catch(() => setMsg("Error al cargar tutores."));
-  }, []);
+    if (!esSoloTutor) {
+      axios
+        .get(`${BASE}/admin/listar-tutores`)
+        .then(res => setTutores(res.data || []))
+        .catch(() => setMsg("Error al cargar tutores."));
+    }
+  }, [esSoloTutor]);
+
+  // si es tutor, cargar sus clases automáticamente
+  useEffect(() => {
+    if (!esSoloTutor) return;
+    const inicial = idPersonaSesion;
+    if (!inicial) return;
+    setTutorSel(inicial);
+    cargarClases(inicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esSoloTutor, idPersonaSesion]);
 
   const cargarClases = async id_persona => {
     setClases([]);
@@ -106,10 +123,11 @@ function TomaDeAsistenciaEstudiante() {
 
       await cargarEstudiantes(tabActiva);
 
-      if (tutorSel) {
+      const idPersona = esSoloTutor ? idPersonaSesion : tutorSel;
+      if (idPersona) {
         const rHist = await axios.get(
           `${BASE}/admin/listar-asistencia-estudiantes-todas`,
-          { params: { id_persona: tutorSel } }
+          { params: { id_persona: idPersona } }
         );
         setHistorialPlano(rHist.data || []);
       }
@@ -167,7 +185,11 @@ function TomaDeAsistenciaEstudiante() {
 
   return (
     <div className="aulas-panel" style={{ maxWidth: "100%", margin: "24px 20px" }}>
-      <h2 style={{ marginBottom: 18 }}>Toma de asistencia (estudiantes)</h2>
+      <h2 style={{ marginBottom: 18 }}>
+        {esSoloTutor
+          ? "Mi toma de asistencia (estudiantes)"
+          : "Toma de asistencia (estudiantes)"}
+      </h2>
 
       <div
         style={{
@@ -178,54 +200,40 @@ function TomaDeAsistenciaEstudiante() {
           marginBottom: 16,
         }}
       >
-        <label>
-          <b>Tutor:</b>
-          <select
-            className="aulas-form-input"
-            value={tutorSel}
-            onChange={e => {
-              const v = e.target.value;
-              setTutorSel(v);
-              cargarClases(v);
-            }}
-            style={{ marginLeft: 8, minWidth: 180 }}
-          >
-            <option value="">Seleccione tutor</option>
-            {tutores.map(t => (
-              <option key={t.id_persona} value={t.id_persona}>
-                {t.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Selector de tutor solo para admin/administrativo */}
+        {!esSoloTutor && (
+          <label>
+            <b>Tutor:</b>
+            <select
+              className="aulas-form-input"
+              value={tutorSel}
+              onChange={e => {
+                const v = e.target.value;
+                setTutorSel(v);
+                cargarClases(v);
+              }}
+              style={{ marginLeft: 8, minWidth: 180 }}
+            >
+              <option value="">Seleccione tutor</option>
+              {tutores.map(t => (
+                <option key={t.id_persona} value={t.id_persona}>
+                  {t.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {clases.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-            marginBottom: 18,
-            borderBottom: "1px solid #e5e7eb",
-            paddingBottom: 6,
-          }}
-        >
+        <div className="asist-tabs">
           <button
             type="button"
             onClick={() => cambiarTab("TODAS")}
-            style={{
-              padding: "6px 14px",
-              borderRadius: 999,
-              border:
-                tabActiva === "TODAS"
-                  ? "2px solid #2563eb"
-                  : "1px solid #d1d5db",
-              background: tabActiva === "TODAS" ? "#eff6ff" : "#ffffff",
-              color: tabActiva === "TODAS" ? "#1d4ed8" : "#374151",
-              fontWeight: 500,
-              cursor: "pointer",
-            }}
+            className={
+              "asist-tab asist-tab-todas" +
+              (tabActiva === "TODAS" ? " active" : "")
+            }
           >
             Todas las asistencias
           </button>
@@ -235,24 +243,10 @@ function TomaDeAsistenciaEstudiante() {
               key={c.id_asist}
               type="button"
               onClick={() => cambiarTab(String(c.id_asist))}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 999,
-                border:
-                  String(tabActiva) === String(c.id_asist)
-                    ? "2px solid #2563eb"
-                    : "1px solid #d1d5db",
-                background:
-                  String(tabActiva) === String(c.id_asist)
-                    ? "#eff6ff"
-                    : "#ffffff",
-                color:
-                  String(tabActiva) === String(c.id_asist)
-                    ? "#1d4ed8"
-                    : "#374151",
-                fontSize: ".9rem",
-                cursor: "pointer",
-              }}
+              className={
+                "asist-tab" +
+                (String(tabActiva) === String(c.id_asist) ? " active" : "")
+              }
             >
               {c.fecha_clase} • Aula {c.id_aula}
             </button>

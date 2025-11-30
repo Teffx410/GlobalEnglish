@@ -31,9 +31,9 @@ function AsignarAula() {
   });
 
   useEffect(() => {
-    axios.get(`${BASE}/estudiantes`).then((r) => setEstudiantes(r.data || []));
-    axios.get(`${BASE}/instituciones`).then((r) => setInstituciones(r.data || []));
-    axios.get(`${BASE}/aulas`).then((r) => setAulas(r.data || []));
+    axios.get(`${BASE}/estudiantes`).then(r => setEstudiantes(r.data || []));
+    axios.get(`${BASE}/instituciones`).then(r => setInstituciones(r.data || []));
+    axios.get(`${BASE}/aulas`).then(r => setAulas(r.data || []));
   }, []);
 
   function cargarSedes(id_institucion) {
@@ -43,11 +43,9 @@ function AsignarAula() {
     }
     axios
       .get(`${BASE}/sedes`)
-      .then((r) => {
+      .then(r => {
         setSedes(
-          (r.data || []).filter(
-            (s) => s.id_institucion === Number(id_institucion)
-          )
+          (r.data || []).filter(s => s.id_institucion === Number(id_institucion))
         );
       })
       .catch(() => setSedes([]));
@@ -60,17 +58,17 @@ function AsignarAula() {
     }
     axios
       .get(`${BASE}/estudiantes-aula/${id_aula}`)
-      .then((r) => setEstudiantesAula(r.data || []))
+      .then(r => setEstudiantesAula(r.data || []))
       .catch(() => setEstudiantesAula([]));
   }
 
   function handleFormChange(e) {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+    setForm(f => ({ ...f, [name]: value }));
     setMsg("");
 
     if (name === "id_institucion") {
-      setForm((f) => ({
+      setForm(f => ({
         ...f,
         id_institucion: value,
         id_sede: "",
@@ -81,12 +79,12 @@ function AsignarAula() {
     }
 
     if (name === "id_sede") {
-      setForm((f) => ({ ...f, id_sede: value, id_aula: "" }));
+      setForm(f => ({ ...f, id_sede: value, id_aula: "" }));
       setEstudiantesAula([]);
     }
 
     if (name === "id_aula") {
-      setForm((f) => ({ ...f, id_aula: value }));
+      setForm(f => ({ ...f, id_aula: value }));
       cargarEstudiantesAula(value);
     }
   }
@@ -94,7 +92,7 @@ function AsignarAula() {
   function aulasFiltradas() {
     if (!form.id_institucion || !form.id_sede) return [];
     return aulas.filter(
-      (a) =>
+      a =>
         a.id_institucion === Number(form.id_institucion) &&
         a.id_sede === Number(form.id_sede)
     );
@@ -115,7 +113,7 @@ function AsignarAula() {
       });
       setMsg("Estudiante asignado correctamente");
       cargarEstudiantesAula(form.id_aula);
-      setForm((f) => ({ ...f, id_estudiante: "" }));
+      setForm(f => ({ ...f, id_estudiante: "" }));
     } catch (err) {
       if (err.response?.data?.detail) {
         setMsg("Error: " + err.response.data.detail);
@@ -168,7 +166,7 @@ function AsignarAula() {
 
   function handleModalChange(e) {
     const { name, value } = e.target;
-    setModalData((m) => ({ ...m, [name]: value }));
+    setModalData(m => ({ ...m, [name]: value }));
   }
 
   async function confirmarModal() {
@@ -236,7 +234,7 @@ function AsignarAula() {
           required
         >
           <option value="">Estudiante</option>
-          {estudiantes.map((est) => (
+          {estudiantes.map(est => (
             <option key={est.id_estudiante} value={est.id_estudiante}>
               {est.nombres} {est.apellidos} (ID: {est.id_estudiante})
             </option>
@@ -251,7 +249,7 @@ function AsignarAula() {
           required
         >
           <option value="">Institución</option>
-          {instituciones.map((i) => (
+          {instituciones.map(i => (
             <option key={i.id_institucion} value={i.id_institucion}>
               {i.nombre_inst}
             </option>
@@ -267,7 +265,7 @@ function AsignarAula() {
           disabled={!form.id_institucion}
         >
           <option value="">Sede</option>
-          {sedes.map((s) => (
+          {sedes.map(s => (
             <option key={s.id_sede} value={s.id_sede}>
               {s.direccion} ({s.id_sede})
             </option>
@@ -283,7 +281,7 @@ function AsignarAula() {
           disabled={!form.id_sede}
         >
           <option value="">Aula</option>
-          {aulasFiltradas().map((a) => (
+          {aulasFiltradas().map(a => (
             <option key={a.id_aula} value={a.id_aula}>
               Grado {a.grado} ({a.id_aula})
             </option>
@@ -323,7 +321,7 @@ function AsignarAula() {
             </tr>
           </thead>
           <tbody>
-            {estudiantesAula.map((e) => (
+            {estudiantesAula.map(e => (
               <tr key={e.id_hist_aula_est}>
                 <td>{e.id_estudiante}</td>
                 <td>
@@ -343,8 +341,7 @@ function AsignarAula() {
                       </button>
                       <button
                         type="button"
-                        className="btn-editar"
-                        style={{ marginLeft: "6px", backgroundColor: "#f0ad4e" }}
+                        className="btn-cambiar"
                         onClick={() => abrirModalCambiar(e)}
                       >
                         Cambiar
@@ -421,7 +418,7 @@ function AsignarAula() {
                     className="aulas-form-input"
                   >
                     <option value="">Seleccione aula destino</option>
-                    {aulas.map((a) => (
+                    {aulas.map(a => (
                       <option key={a.id_aula} value={a.id_aula}>
                         Grado {a.grado} ({a.id_aula}) – Inst {a.id_institucion} Sede{" "}
                         {a.id_sede}

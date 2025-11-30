@@ -1,3 +1,4 @@
+// src/components/Admin/HorarioTutorCalendar.js
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
@@ -9,9 +10,9 @@ import esES from "date-fns/locale/es";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "../../styles/AdminDashboard.css";
 
+const BASE = "http://localhost:8000";
 
 const locales = { es: esES };
-
 
 const localizer = dateFnsLocalizer({
   format,
@@ -22,41 +23,51 @@ const localizer = dateFnsLocalizer({
 });
 
 function diaSemanaToNumber(dia) {
-  const days = { "Lunes": 1, "Martes": 2, "Miércoles": 3, "Jueves": 4, "Viernes": 5, "Sábado": 6, "Domingo": 0 };
+  const days = {
+    Lunes: 1,
+    Martes: 2,
+    Miércoles: 3,
+    Jueves: 4,
+    Viernes: 5,
+    Sábado: 6,
+    Domingo: 0,
+  };
   return days[dia] ?? 1;
 }
 
 // Paleta pastel
 const aulaColors = [
-  "#A3CEF1", "#CDF2CA", "#FFE5B4", "#FFD6E0", "#FDE7C8",
-  "#E9DEF7", "#D2F6F7", "#FFDEB4", "#D6E4FF"
+  "#A3CEF1",
+  "#CDF2CA",
+  "#FFE5B4",
+  "#FFD6E0",
+  "#FDE7C8",
+  "#E9DEF7",
+  "#D2F6F7",
+  "#FFDEB4",
+  "#D6E4FF",
 ];
-
 
 function convertirHorarioAEventos(horarios, fechaBase) {
   if (!horarios || horarios.length === 0) return [];
-  
+
   const baseWeek = startOfWeek(fechaBase, { weekStartsOn: 1 });
 
   return horarios
     .filter(h => {
-      // Si no tiene fecha de inicio, lo muestra siempre
       if (!h.fecha_inicio) return true;
-      // Convertir a Date si viene como string
       const fechaInicio = new Date(h.fecha_inicio);
-      // La semana actual solo muestra eventos si ya empezó el horario vigente
       return baseWeek >= startOfWeek(fechaInicio, { weekStartsOn: 1 });
     })
-    .map((h, idx) => {
-      // ... lo demás igual
-      let dayNum = diaSemanaToNumber(h.dia_semana);
-      let baseDate = new Date(baseWeek);
+    .map(h => {
+      const dayNum = diaSemanaToNumber(h.dia_semana);
+      const baseDate = new Date(baseWeek);
       baseDate.setDate(baseWeek.getDate() + (dayNum === 0 ? 6 : dayNum - 1));
       const [hInit, mInit] = h.h_inicio.split(":").map(Number);
       const [hFin, mFin] = h.h_final.split(":").map(Number);
-      let start = new Date(baseDate);
+      const start = new Date(baseDate);
       start.setHours(hInit, mInit, 0, 0);
-      let end = new Date(baseDate);
+      const end = new Date(baseDate);
       end.setHours(hFin, mFin, 0, 0);
 
       return {
@@ -64,64 +75,83 @@ function convertirHorarioAEventos(horarios, fechaBase) {
         start,
         end,
         allDay: false,
-        tooltip: `Día: ${h.dia_semana}, ${h.h_inicio}-${h.h_final}\nCont: ${h.es_continuo === "S" ? "Sí" : "No"}\nMinutos: ${h.minutos_equiv}`,
-        bgcolor: aulaColors[h.id_aula % aulaColors.length]
+        tooltip: `Día: ${h.dia_semana}, ${h.h_inicio}-${h.h_final}\nCont: ${
+          h.es_continuo === "S" ? "Sí" : "No"
+        }\nMinutos: ${h.minutos_equiv}`,
+        bgcolor: aulaColors[h.id_aula % aulaColors.length],
       };
     });
 }
 
-
 function HorarioTutorCalendar() {
+  const rol = localStorage.getItem("rol");
+  const esSoloTutor = rol === "TUTOR";
+  const idPersonaSesion = localStorage.getItem("id_persona") || "";
+
   const [tutores, setTutores] = useState([]);
-  const [selectedTutor, setSelectedTutor] = useState("");
+  const [selectedTutor, setSelectedTutor] = useState(
+    esSoloTutor ? idPersonaSesion : ""
+  );
   const [horarios, setHorarios] = useState([]);
   const [eventos, setEventos] = useState([]);
   const [fechaView, setFechaView] = useState(new Date());
   const [error, setError] = useState("");
 
-
+  // cargar tutores solo si no es tutor
   useEffect(() => {
-    axios.get("http://localhost:8000/personas")
-      .then(r => {
-        const tutoresFiltered = r.data.filter(p => p.rol === "TUTOR");
-        setTutores(tutoresFiltered);
-      })
-      .catch(err => {
-        console.error("Error al cargar tutores:", err);
-        setError("Error al cargar tutores");
-      });
-  }, []);
+    if (!esSoloTutor) {
+      axios
+        .get(`${BASE}/personas`)
+        .then(r => {
+          const tutoresFiltered = (r.data || []).filter(p => p.rol === "TUTOR");
+          setTutores(tutoresFiltered);
+        })
+        .catch(err => {
+          console.error("Error al cargar tutores:", err);
+          setError("Error al cargar tutores");
+        });
+    }
+  }, [esSoloTutor]);
 
+  // si es tutor, cargar su horario directamente
+  useEffect(() => {
+    if (!esSoloTutor) return;
+    if (!idPersonaSesion) return;
+    cargarHorarioTutor(idPersonaSesion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esSoloTutor, idPersonaSesion]);
+
+  const cargarHorarioTutor = id => {
+    setSelectedTutor(id);
+    setError("");
+    if (id) {
+      axios
+        .get(`${BASE}/horarios-tutor/${id}`)
+        .then(r => {
+          setHorarios(r.data || []);
+          setEventos(convertirHorarioAEventos(r.data || [], new Date()));
+          setFechaView(new Date());
+        })
+        .catch(err => {
+          console.error(
+            "✗ ERROR en la solicitud:",
+            err.response?.status,
+            err.response?.data
+          );
+          setError(`Error: ${err.response?.data?.detail || err.message}`);
+          setHorarios([]);
+          setEventos([]);
+        });
+    } else {
+      setHorarios([]);
+      setEventos([]);
+    }
+  };
 
   function handleTutorChange(e) {
-  const id = e.target.value;
-  setSelectedTutor(id);
-  setError("");
-  
-  if (id) {
-    axios.get(`http://localhost:8000/horarios-tutor/${id}`)
-      .then(r => {
-        console.log("✓ Respuesta exitosa:", r.data);
-        setHorarios(r.data);
-        setEventos(convertirHorarioAEventos(r.data, new Date()));
-        setFechaView(new Date());
-      })
-      .catch(err => {
-        console.error("✗ ERROR en la solicitud:", err.response?.status, err.response?.data);
-        console.error("URL intentada:", `http://localhost:8000/horarios-tutor/${id}`);
-        console.error("Mensaje completo:", err.message);
-        setError(`Error: ${err.response?.data?.detail || err.message}`);
-        setHorarios([]);
-        setEventos([]);
-      });
-  } else {
-    setHorarios([]);
-    setEventos([]);
+    const id = e.target.value;
+    cargarHorarioTutor(id);
   }
-}
-
-
-
 
   function handleNavigate(nuevaFecha) {
     setFechaView(nuevaFecha);
@@ -130,46 +160,45 @@ function HorarioTutorCalendar() {
     }
   }
 
-
   return (
     <div className="instituciones-panel">
-      <h2 style={{ marginBottom: "24px", color: "#3269fb", fontWeight: "bold" }}>Horario Semanal Visual del Tutor</h2>
-      
-      <select 
-        className="aulas-form-input" 
-        style={{ maxWidth: 400, fontWeight: 'bold', color: '#26436c' }} 
-        value={selectedTutor} 
-        onChange={handleTutorChange}
-      >
-        <option value="">Seleccione Tutor</option>
-        {tutores.map(t =>
-          <option key={t.id_persona} value={t.id_persona}>
-            {t.nombre} ({t.correo})
-          </option>
-        )}
-      </select>
-      
+      <h2 className="asistencia-title">
+        Horario semanal visual del tutor
+      </h2>
+
+      {/* Selector solo visible para admin/administrativo */}
+      {!esSoloTutor && (
+        <select
+          className="aulas-form-input"
+          style={{ maxWidth: 400 }}
+          value={selectedTutor}
+          onChange={handleTutorChange}
+        >
+          <option value="">Seleccione Tutor</option>
+          {tutores.map(t => (
+            <option key={t.id_persona} value={t.id_persona}>
+              {t.nombre} ({t.correo})
+            </option>
+          ))}
+        </select>
+      )}
+
       {error && (
-        <div style={{ 
-          color: "#a11", 
-          padding: "10px", 
-          background: "#ffefef", 
-          borderRadius: "4px", 
-          marginBottom: "10px",
-          marginTop: "10px"
-        }}>
+        <div
+          style={{
+            color: "#a11",
+            padding: "10px",
+            background: "#ffefef",
+            borderRadius: "4px",
+            marginBottom: "10px",
+            marginTop: "10px",
+          }}
+        >
           ❌ {error}
         </div>
       )}
-      
-      <div style={{
-        height: "600px",
-        marginTop: "36px",
-        borderRadius: "17px",
-        overflow: "hidden",
-        background: "#f8fafe",
-        boxShadow: "0 3px 16px #36576018"
-      }}>
+
+      <div className="tutor-calendar-wrapper">
         <Calendar
           localizer={localizer}
           events={eventos}
@@ -182,12 +211,12 @@ function HorarioTutorCalendar() {
           views={["week"]}
           culture="es"
           toolbar
-          messages={{ 
-            week: "Semana", 
-            day: "Día", 
-            today: "Hoy", 
-            previous: "Atrás", 
-            next: "Siguiente" 
+          messages={{
+            week: "Semana",
+            day: "Día",
+            today: "Hoy",
+            previous: "Atrás",
+            next: "Siguiente",
           }}
           eventPropGetter={event => ({
             style: {
@@ -196,12 +225,11 @@ function HorarioTutorCalendar() {
               borderRadius: "12px",
               border: "none",
               fontWeight: 400,
-              fontSize: "0.55em",
-              padding: "1px 4px",
+              fontSize: "0.75em",
+              padding: "4px 6px",
               boxShadow: "0 2px 10px #3269fb18",
-              lineHeight: 1.07,
-              whiteSpace: "pre-line"
-            }
+              whiteSpace: "pre-line",
+            },
           })}
           tooltipAccessor={event => event.tooltip}
         />

@@ -868,9 +868,10 @@ def list_horarios_aula(id_aula: int):
 # ASIGNACIÓN TUTOR AULA
 # ============================
 
+
 def list_tutores_aula(id_aula: int):
     """
-    Historial de tutores de un aula usando TUTOR_AULA.
+    Historial de tutores de un aula usando TUTOR_AULA + ASIGNACION_TUTOR.
     """
     conn = get_conn()
     cur = conn.cursor()
@@ -928,35 +929,120 @@ def aula_tiene_tutor_activo(id_aula: int) -> bool:
         cur.close()
         conn.close()
 
+def obtener_horarios_aula_en_fecha(id_aula: int, fecha: str):
+    """
+    Devuelve una lista de tuplas (dia_semana, h_inicio, h_final) para el aula
+    que estén vigentes en la fecha dada (YYYY-MM-DD).
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT h.dia_semana, h.h_inicio, h.h_final
+            FROM HISTORICO_HORARIO_AULA hha
+            JOIN HORARIO h ON h.id_horario = hha.id_horario
+            WHERE hha.id_aula = :id_aula
+              AND hha.fecha_inicio <= TO_DATE(:fecha, 'YYYY-MM-DD')
+              AND (hha.fecha_fin IS NULL OR hha.fecha_fin >= TO_DATE(:fecha, 'YYYY-MM-DD'))
+        """, {"id_aula": id_aula, "fecha": fecha[:10]})
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def obtener_aulas_activas_tutor(id_persona: int, fecha: str):
+    """
+    Devuelve los id_aula donde el tutor está activo en la fecha dada.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT ta.id_aula
+            FROM ASIGNACION_TUTOR at
+            JOIN TUTOR_AULA ta ON ta.id_tutor_aula = at.id_tutor_aula
+            WHERE at.id_persona = :id_persona
+              AND at.fecha_inicio <= TO_DATE(:fecha, 'YYYY-MM-DD')
+              AND (at.fecha_fin IS NULL OR at.fecha_fin >= TO_DATE(:fecha, 'YYYY-MM-DD'))
+        """, {"id_persona": id_persona, "fecha": fecha[:10]})
+        return [r[0] for r in cur.fetchall()]
+    finally:
+        cur.close()
+        conn.close()
+
+
+
+def rangos_se_solapan(h1_ini: str, h1_fin: str, h2_ini: str, h2_fin: str) -> bool:
+    """
+    Determina si dos rangos horarios [h1_ini, h1_fin) y [h2_ini, h2_fin) se solapan.
+    Formato de hora: 'HH24:MI' guardado como VARCHAR2(5).
+    """
+    return h1_ini < h2_fin and h1_fin > h2_ini
+
+
+def hay_cruce_horario_tutor(id_persona: int, id_aula_nueva: int, fecha_inicio_nueva: str) -> bool:
+    """
+    True si el tutor ya tiene alguna otra aula activa en esa fecha
+    cuyo horario se cruza con el horario del aula nueva.
+    """
+    fecha = fecha_inicio_nueva[:10]
+
+    # Horarios de la nueva aula
+    horarios_nueva = obtener_horarios_aula_en_fecha(id_aula_nueva, fecha)
+    if not horarios_nueva:
+        # Si el aula no tiene horarios definidos, no se puede validar cruce
+        return False
+
+    # Aulas donde el tutor ya está activo en esa fecha
+    aulas_existentes = obtener_aulas_activas_tutor(id_persona, fecha)
+
+    for id_aula_exist in aulas_existentes:
+        if id_aula_exist == id_aula_nueva:
+            continue  # misma aula, no cuenta como cruce
+
+        horarios_exist = obtener_horarios_aula_en_fecha(id_aula_exist, fecha)
+        for dia_n, hi_n, hf_n in horarios_nueva:
+            for dia_e, hi_e, hf_e in horarios_exist:
+                if dia_n == dia_e and rangos_se_solapan(hi_n, hf_n, hi_e, hf_e):
+                    return True
+
+    return False
+
 
 def asignar_tutor_aula(data: dict):
     """
-    Asigna tutor SOLO si el aula NO tiene tutor activo.
+    Asigna tutor SOLO si el aula NO tiene tutor activo
+    y no hay cruce de horario con otras aulas activas de ese tutor.
     Inserta en ASIGNACION_TUTOR y vincula en TUTOR_AULA.
     """
     id_persona = int(data["id_persona"])
     id_aula = int(data["id_aula"])
     fecha_inicio = str(data["fecha_inicio"])[:10]
-    motivo = data.get("motivo_cambio")
 
+    # 1) Validar que el aula no tenga tutor activo
     if aula_tiene_tutor_activo(id_aula):
         return {
             "error": "El aula ya tiene un tutor activo. Use la opción de 'Finalizar y cambiar tutor'."
         }
 
+    # 2) Validar cruce de horarios con otras aulas del tutor
+    if hay_cruce_horario_tutor(id_persona, id_aula, fecha_inicio):
+        return {
+            "error": "El tutor ya tiene otra aula con horario que se cruza con esta a partir de esa fecha."
+        }
+
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # nueva asignación
         new_id = cur.var(oracledb.NUMBER)
         cur.execute("""
             INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, motivo_cambio)
-            VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), :3)
-            RETURNING id_tutor_aula INTO :4
-        """, (id_persona, fecha_inicio, motivo, new_id))
+            VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), NULL)
+            RETURNING id_tutor_aula INTO :3
+        """, (id_persona, fecha_inicio, new_id))
         id_tutor_aula = int(new_id.getvalue()[0])
 
-        # vincular al aula
         cur.execute("""
             INSERT INTO TUTOR_AULA (id_tutor_aula, id_aula)
             VALUES (:1, :2)
@@ -972,7 +1058,8 @@ def asignar_tutor_aula(data: dict):
 def cambiar_tutor_aula(data: dict):
     """
     Finaliza tutor actual de esa aula y crea nueva asignación para el nuevo tutor.
-    Usa TUTOR_AULA para mantener el historial.
+    El motivo se guarda SOLO en la asignación que se cierra.
+    Antes de crear la nueva se valida cruce de horarios con otras aulas activas del tutor.
     """
     id_aula = int(data["id_aula"])
     id_persona_nuevo = int(data["id_persona"])
@@ -981,10 +1068,16 @@ def cambiar_tutor_aula(data: dict):
     id_tutor_aula_actual = int(data["id_tutor_aula_actual"])
     fecha_fin_actual = data.get("fecha_fin_actual")
 
+    # Validar cruce de horarios para el nuevo tutor
+    if hay_cruce_horario_tutor(id_persona_nuevo, id_aula, fecha_inicio_nuevo):
+        return {
+            "error": "El nuevo tutor ya tiene otra aula con horario que se cruza con esta a partir de esa fecha."
+        }
+
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # cerrar asignación actual
+        # 1) cerrar asignación actual (motivo solo aquí)
         if fecha_fin_actual:
             cur.execute("""
                 UPDATE ASIGNACION_TUTOR
@@ -1002,29 +1095,35 @@ def cambiar_tutor_aula(data: dict):
                   AND fecha_fin IS NULL
             """, (motivo, id_tutor_aula_actual))
 
-        # nueva asignación
+        # 2) nueva asignación (sin motivo)
         new_id = cur.var(oracledb.NUMBER)
         cur.execute("""
             INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, motivo_cambio)
-            VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), :3)
-            RETURNING id_tutor_aula INTO :4
-        """, (id_persona_nuevo, fecha_inicio_nuevo, motivo, new_id))
+            VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), NULL)
+            RETURNING id_tutor_aula INTO :3
+        """, (id_persona_nuevo, fecha_inicio_nuevo, new_id))
         id_tutor_aula_nuevo = int(new_id.getvalue()[0])
 
-        # vincular nueva asignación al aula
         cur.execute("""
             INSERT INTO TUTOR_AULA (id_tutor_aula, id_aula)
             VALUES (:1, :2)
         """, (id_tutor_aula_nuevo, id_aula))
 
         conn.commit()
-        return {"msg": "Tutor cambiado correctamente.", "id_tutor_aula": id_tutor_aula_nuevo}
+        return {
+            "msg": "Tutor cambiado correctamente.",
+            "id_tutor_aula": id_tutor_aula_nuevo,
+        }
     finally:
         cur.close()
         conn.close()
 
 
-def finalizar_asignacion_tutor(id_tutor_aula: int, fecha_fin: Optional[str] = None, motivo: Optional[str] = None):
+def finalizar_asignacion_tutor(
+    id_tutor_aula: int,
+    fecha_fin: Optional[str] = None,
+    motivo: Optional[str] = None
+):
     """
     Marca una asignación de tutor como finalizada (pone FECHA_FIN y opcionalmente motivo).
     """
@@ -1055,6 +1154,8 @@ def finalizar_asignacion_tutor(id_tutor_aula: int, fecha_fin: Optional[str] = No
     finally:
         cur.close()
         conn.close()
+
+
 
 # ============================
 # HISTÓRICO AULA ESTUDIANTE

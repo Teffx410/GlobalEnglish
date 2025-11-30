@@ -8,9 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from hashlib import sha256
-
-
-
+from datetime import datetime, timedelta
+from .auth import create_token 
 app = FastAPI()
 
 # Permitir llamadas desde el frontend React (por defecto en localhost:3000)
@@ -439,7 +438,11 @@ def listar_tutores():
 
 @app.get("/admin/listar-aulas-tutor")
 def listar_aulas_tutor(id_persona: int):
-    return crud.listar_aulas_tutor(id_persona)
+    print(">>> listar_aulas_tutor endpoint id_persona =", id_persona)
+    datos = crud.listar_aulas_tutor(id_persona)
+    print(">>> listar_aulas_tutor resultado =", datos)
+    return datos
+
 
 @app.get("/id-tutor-aula/{id_tutor}/{id_aula}")
 def get_id_tutor_aula(id_tutor: int, id_aula: int):
@@ -700,23 +703,32 @@ class LoginIn(BaseModel):
     correo: str
     contrasena: str
 
+
 @app.post("/login")
 def login(payload: LoginIn):
     print("****** LOGIN ENDPOINT CALLED ******")
     print("LOGIN DATA:", payload)
+
+    conn = None
+    cur = None
     try:
         conn = crud.get_conn()
         cur = conn.cursor()
 
-        correo_buscar = payload.correo.strip().lower()
-        print("Buscando correo:", repr(correo_buscar))
+        # Correo tal cual llega del front
+        correo_buscar = payload.correo
+        print("Buscando correo EXACTO:", repr(correo_buscar))
 
+        # Buscar usuario por correo
         cur.execute("""
-            SELECT u.contrasena, p.rol, u.nombre_user
+            SELECT u.contrasena,
+                   p.rol,
+                   u.nombre_user,
+                   p.id_persona
             FROM USUARIO u
             JOIN PERSONA p ON u.id_persona = p.id_persona
-            WHERE TRIM(LOWER(p.correo)) = TRIM(LOWER(:1))
-        """, (correo_buscar,))
+            WHERE p.correo = :correo
+        """, {"correo": correo_buscar})
 
         result = cur.fetchone()
         print("DB QUERY RESULT:", result)
@@ -725,27 +737,34 @@ def login(payload: LoginIn):
             print("No se encontró usuario con ese correo")
             raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
 
-        db_pass, rol, nombre_user = result
-        hash_ingresada = sha256(payload.contrasena.encode()).hexdigest()
-        print("Hash BD:      ", db_pass)
-        print("Hash ingresada:", hash_ingresada)
+        db_pass, rol, nombre_user, id_persona = result
 
-        if db_pass != hash_ingresada:
+        # Hash de la contraseña ingresada
+        hash_ingresada = sha256(payload.contrasena.encode()).hexdigest()
+
+        print("Hash BD repr:      ", repr(db_pass))
+        print("Hash ingresada repr:", repr(hash_ingresada))
+
+        if str(db_pass).strip() != hash_ingresada.strip():
             print("Hashes NO coinciden")
             raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
 
+        # Crear token
         token = create_token({
             "correo": payload.correo,
             "rol": rol,
-            "nombre_user": nombre_user
+            "nombre_user": nombre_user,
+            "id_persona": int(id_persona),
         })
-        print("Login OK para:", nombre_user, "rol:", rol)
+        print("Login OK para:", nombre_user, "rol:", rol, "id_persona:", id_persona)
 
         return {
             "ftoken": token,
             "rol": rol,
-            "nombre_user": nombre_user
+            "nombre_user": nombre_user,
+            "id_persona": int(id_persona),
         }
+
     except HTTPException:
         raise
     except Exception as e:
@@ -753,8 +772,10 @@ def login(payload: LoginIn):
         raise HTTPException(status_code=500, detail="Error al iniciar sesión")
     finally:
         try:
-            cur.close()
-            conn.close()
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
         except:
             pass
 
@@ -820,3 +841,222 @@ def post_notas_tutor_periodo(payload: dict):
 def aulas_por_tutor(id_persona: int):
     return crud.listar_aulas_tutor(id_persona)
 
+
+@app.get("/admin/dashboard-kpis")
+def dashboard_kpis(
+    rol: str = Query(""),
+    id_persona: int | None = Query(None),
+):
+    from .db import get_conn
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # -------- KPIs GLOBALes (ADMIN / ADMINISTRATIVO) --------
+        if rol != "TUTOR" or not id_persona:
+            cur.execute("SELECT COUNT(*) FROM INSTITUCION")
+            instituciones = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM AULA")
+            aulas_activas = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM ESTUDIANTE")
+            estudiantes = cur.fetchone()[0]
+
+            # Promedio global de clases cumplidas (dictadas o con reposición)
+            cur.execute("""
+                SELECT NVL(ROUND(AVG(
+                    CASE
+                      WHEN aa.dictada = 'S' THEN 100
+                      WHEN aa.dictada = 'N'
+                           AND aa.reposicion = 'S'
+                           AND aa.fecha_reposicion IS NOT NULL
+                        THEN 100
+                      ELSE 0
+                    END
+                )),0)
+                FROM ASISTENCIA_AULA aa
+            """)
+            asis_prom = cur.fetchone()[0]
+
+            return {
+                "instituciones": instituciones,
+                "aulas_activas": aulas_activas,
+                "estudiantes": estudiantes,
+                "asistencia_promedio": asis_prom,
+            }
+
+        # -------- KPIs DEL TUTOR (solo sus aulas/estudiantes) --------
+
+        # Aulas donde el tutor tiene asignación vigente
+        cur.execute("""
+            SELECT COUNT(DISTINCT a.id_aula)
+            FROM ASIGNACION_TUTOR at
+            JOIN TUTOR_AULA ta ON ta.id_tutor_aula = at.id_tutor_aula
+            JOIN AULA a        ON a.id_aula        = ta.id_aula
+            WHERE at.id_persona = :1
+              AND at.fecha_fin IS NULL
+        """, (id_persona,))
+        aulas_activas = cur.fetchone()[0]
+
+        # Estudiantes actualmente en esas aulas
+        cur.execute("""
+            SELECT COUNT(DISTINCT hae.id_estudiante)
+            FROM ASIGNACION_TUTOR at
+            JOIN TUTOR_AULA ta ON ta.id_tutor_aula = at.id_tutor_aula
+            JOIN AULA a        ON a.id_aula        = ta.id_aula
+            JOIN HISTORICO_AULA_ESTUDIANTE hae
+                 ON hae.id_aula = a.id_aula
+                AND hae.fecha_fin IS NULL
+            WHERE at.id_persona = :1
+              AND at.fecha_fin IS NULL
+        """, (id_persona,))
+        estudiantes = cur.fetchone()[0]
+
+        # Asistencia promedio del tutor (clase dictada o con reposición cuenta como 100)
+        cur.execute("""
+            SELECT NVL(ROUND(AVG(
+                CASE
+                  WHEN aa.dictada = 'S' THEN 100
+                  WHEN aa.dictada = 'N'
+                       AND aa.reposicion = 'S'
+                       AND aa.fecha_reposicion IS NOT NULL
+                    THEN 100
+                  ELSE 0
+                END
+            )),0)
+            FROM ASIGNACION_TUTOR at
+            JOIN ASISTENCIA_AULA aa
+                 ON aa.id_tutor_aula = at.id_tutor_aula
+            WHERE at.id_persona = :1
+              AND at.fecha_fin IS NULL
+        """, (id_persona,))
+        asis_prom = cur.fetchone()[0]
+
+        return {
+            "instituciones": 0,
+            "aulas_activas": aulas_activas,
+            "estudiantes": estudiantes,
+            "asistencia_promedio": asis_prom,
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/admin/dashboard-actividad")
+def dashboard_actividad(
+    rol: str = Query(""),
+    id_persona: int | None = Query(None),
+):
+    """
+    Devuelve una lista de actividades recientes para el dashboard.
+    Formato: [{texto: str, hace: str}]
+    """
+    from .db import get_conn
+    conn = get_conn()
+    cur = conn.cursor()
+    actividades = []
+    try:
+        # ADMIN / ADMINISTRATIVO: eventos globales simples
+        if rol != "TUTOR" or not id_persona:
+            # Últimas aulas creadas
+            cur.execute("""
+                SELECT a.id_aula, a.grado, i.nombre_inst, a.rowid,
+                       a.id_aula, a.id_institucion, a.id_sede
+                FROM AULA a
+                JOIN SEDE s ON s.id_institucion = a.id_institucion
+                           AND s.id_sede       = a.id_sede
+                JOIN INSTITUCION i ON i.id_institucion = a.id_institucion
+                ORDER BY a.id_aula DESC
+            """)
+            filas = cur.fetchmany(3)
+            for r in filas:
+                actividades.append({
+                    "texto": f"Se creó el aula {r[0]} de grado {r[1]} en {r[2]}",
+                    "hace": "Recientemente",
+                })
+
+            # Últimos estudiantes creados
+            cur.execute("""
+                SELECT id_estudiante, nombres, apellidos
+                FROM ESTUDIANTE
+                ORDER BY id_estudiante DESC
+            """)
+            filas = cur.fetchmany(3)
+            for r in filas:
+                actividades.append({
+                    "texto": f"Nuevo estudiante inscrito: {r[1]} {r[2]}",
+                    "hace": "Recientemente",
+                })
+
+            # Últimas tomas de asistencia globales
+            cur.execute("""
+                SELECT id_asist, id_aula, fecha_clase
+                FROM ASISTENCIA_AULA
+                ORDER BY fecha_clase DESC, id_asist DESC
+            """)
+            filas = cur.fetchmany(3)
+            for r in filas:
+                fecha = r[2].strftime("%Y-%m-%d") if isinstance(r[2], datetime) else str(r[2])
+                actividades.append({
+                    "texto": f"Registro de asistencia en aula {r[1]} ({fecha})",
+                    "hace": "Recientemente",
+                })
+
+            return actividades[:5]
+
+        # TUTOR: eventos solo de sus aulas
+
+        # Últimas asistencias registradas por el tutor
+        cur.execute("""
+            SELECT aa.id_asist, aa.id_aula, aa.fecha_clase, aa.dictada, aa.reposicion
+            FROM ASIGNACION_TUTOR at
+            JOIN ASISTENCIA_AULA aa
+                 ON aa.id_tutor_aula = at.id_tutor_aula
+            WHERE at.id_persona = :1
+            ORDER BY aa.fecha_clase DESC, aa.id_asist DESC
+        """, (id_persona,))
+        filas = cur.fetchmany(5)
+        for r in filas:
+            fecha = r[2].strftime("%Y-%m-%d") if isinstance(r[2], datetime) else str(r[2])
+            if r[3] == "S":
+                texto = f"Asistencia registrada (clase dictada) en aula {r[1]} el {fecha}"
+            elif r[4] == "S":
+                texto = f"Reposición registrada para aula {r[1]} (clase del {fecha})"
+            else:
+                texto = f"Clase no dictada en aula {r[1]} el {fecha}"
+            actividades.append({
+                "texto": texto,
+                "hace": "Recientemente",
+            })
+
+        # Últimos estudiantes que entraron a alguna de sus aulas
+        cur.execute("""
+            SELECT e.id_estudiante,
+                e.nombres,
+                e.apellidos,
+                a.id_aula,
+                hae.id_hist_aula_est
+            FROM ASIGNACION_TUTOR at
+            JOIN TUTOR_AULA ta ON ta.id_tutor_aula = at.id_tutor_aula
+            JOIN AULA a        ON a.id_aula        = ta.id_aula
+            JOIN HISTORICO_AULA_ESTUDIANTE hae
+                ON hae.id_aula = a.id_aula
+            JOIN ESTUDIANTE e
+                ON e.id_estudiante = hae.id_estudiante
+            WHERE at.id_persona = :1
+            AND hae.fecha_inicio IS NOT NULL
+            ORDER BY hae.id_hist_aula_est DESC
+        """, (id_persona,))
+
+        filas = cur.fetchmany(3)
+        for r in filas:
+            actividades.append({
+                "texto": f"Nuevo estudiante en tu aula {r[3]}: {r[1]} {r[2]}",
+                "hace": "Recientemente",
+            })
+
+        return actividades[:5]
+    finally:
+        cur.close()
+        conn.close()

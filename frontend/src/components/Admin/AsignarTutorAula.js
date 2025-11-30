@@ -31,14 +31,16 @@ function AsignarTutorAula() {
   const [filaSeleccionada, setFilaSeleccionada] = useState(null);
 
   useEffect(() => {
-    axios.get(`${BASE}/aulas`)
+    axios
+      .get(`${BASE}/aulas`)
       .then(r => setAulas(r.data || []))
       .catch(err => {
         console.error("Error cargando aulas:", err);
         setError("No se pudieron cargar las aulas");
       });
 
-    axios.get(`${BASE}/personas`)
+    axios
+      .get(`${BASE}/personas`)
       .then(r => {
         const tutores = (r.data || []).filter(p => p.rol === "TUTOR");
         setPersonas(tutores);
@@ -54,7 +56,8 @@ function AsignarTutorAula() {
       setHistorial([]);
       return;
     }
-    axios.get(`${BASE}/historial-tutores-aula/${idAula}`)
+    axios
+      .get(`${BASE}/historial-tutores-aula/${idAula}`)
       .then(r => setHistorial(r.data || []))
       .catch(err => {
         console.error("Error cargando historial:", err);
@@ -72,7 +75,7 @@ function AsignarTutorAula() {
     }
   }
 
-  // Asignar tutor nuevo (sin tocar el modal)
+  // Asignar tutor nuevo
   function asignarTutor(e) {
     e.preventDefault();
     setMsg("");
@@ -89,10 +92,11 @@ function AsignarTutorAula() {
       id_aula: parseInt(form.id_aula, 10),
       id_persona: parseInt(form.id_persona, 10),
       fecha_inicio: form.fecha_inicio,
-      motivo_cambio: null,
+      motivo_cambio: null, // el backend lo ignora para alta normal
     };
 
-    axios.post(`${BASE}/asignar-tutor-aula`, payload)
+    axios
+      .post(`${BASE}/asignar-tutor-aula`, payload)
       .then(r => {
         setMsg(r.data.msg || "Tutor asignado correctamente.");
         cargarHistorial(form.id_aula);
@@ -181,16 +185,17 @@ function AsignarTutorAula() {
 
     if (modalMode === "finalizar") {
       setLoading(true);
-      axios.put(
-        `${BASE}/asignacion-tutor/${modalData.id_tutor_aula_actual}/fin`,
-        null,
-        {
-          params: {
-            fecha_fin: modalData.fecha_fin_actual || null,
-            motivo_cambio: modalData.motivo_cambio,
-          },
-        }
-      )
+      axios
+        .put(
+          `${BASE}/asignacion-tutor/${modalData.id_tutor_aula_actual}/fin`,
+          null,
+          {
+            params: {
+              fecha_fin: modalData.fecha_fin_actual || null,
+              motivo_cambio: modalData.motivo_cambio,
+            },
+          }
+        )
         .then(r => {
           setMsg(r.data.msg || "Asignación de tutor finalizada.");
           cargarHistorial(form.id_aula);
@@ -198,7 +203,9 @@ function AsignarTutorAula() {
         })
         .catch(err => {
           console.error("Error al finalizar asignación:", err);
-          setError(err.response?.data?.detail || "Error al finalizar asignación.");
+          setError(
+            err.response?.data?.detail || "Error al finalizar asignación."
+          );
         })
         .finally(() => setLoading(false));
     } else if (modalMode === "cambiar") {
@@ -211,11 +218,12 @@ function AsignarTutorAula() {
         id_aula: parseInt(form.id_aula, 10),
         id_persona: parseInt(modalData.id_persona_nuevo, 10),
         fecha_inicio: modalData.fecha_inicio_nuevo,
-        motivo_cambio: modalData.motivo_cambio,
+        motivo_cambio: modalData.motivo_cambio, // se aplica al tutor saliente
         id_tutor_aula_actual: modalData.id_tutor_aula_actual,
         fecha_fin_actual: modalData.fecha_fin_actual || null,
       };
-      axios.post(`${BASE}/cambiar-tutor-aula`, payload)
+      axios
+        .post(`${BASE}/cambiar-tutor-aula`, payload)
         .then(r => {
           setMsg(r.data.msg || "Tutor cambiado correctamente.");
           cargarHistorial(form.id_aula);
@@ -223,7 +231,11 @@ function AsignarTutorAula() {
         })
         .catch(err => {
           console.error("Error al cambiar tutor:", err);
-          setError(err.response?.data?.detail || "Error al cambiar tutor.");
+          setError(
+            err.response?.data?.detail ||
+              err.response?.data?.error ||
+              "Error al cambiar tutor."
+          );
         })
         .finally(() => setLoading(false));
     }
@@ -246,7 +258,8 @@ function AsignarTutorAula() {
           <option value="">Selecciona un aula</option>
           {aulas.map(a => (
             <option key={a.id_aula} value={a.id_aula}>
-              Aula #{a.id_aula} - {a.grado}° - Inst {a.id_institucion} (Sede {a.id_sede})
+              Aula #{a.id_aula} - {a.grado}° - Inst {a.id_institucion} (Sede{" "}
+              {a.id_sede})
             </option>
           ))}
         </select>
@@ -280,32 +293,38 @@ function AsignarTutorAula() {
         <button
           type="submit"
           className="aulas-btn"
-          disabled={loading || !form.id_aula || !form.id_persona || !form.fecha_inicio}
+          disabled={
+            loading || !form.id_aula || !form.id_persona || !form.fecha_inicio
+          }
         >
           {loading ? "Procesando..." : "Asignar Tutor"}
         </button>
       </form>
 
       {msg && (
-        <div style={{
-          color: "green",
-          marginTop: "10px",
-          background: "#d4edda",
-          borderRadius: "4px",
-          padding: "8px",
-        }}>
+        <div
+          style={{
+            color: "green",
+            marginTop: "10px",
+            background: "#d4edda",
+            borderRadius: "4px",
+            padding: "8px",
+          }}
+        >
           {msg}
         </div>
       )}
 
       {error && (
-        <div style={{
-          color: "red",
-          marginTop: "10px",
-          background: "#f8d7da",
-          borderRadius: "4px",
-          padding: "8px",
-        }}>
+        <div
+          style={{
+            color: "red",
+            marginTop: "10px",
+            background: "#f8d7da",
+            borderRadius: "4px",
+            padding: "8px",
+          }}
+        >
           {error}
         </div>
       )}
@@ -345,8 +364,7 @@ function AsignarTutorAula() {
                       </button>
                       <button
                         type="button"
-                        className="btn-editar"
-                        style={{ marginLeft: "6px", backgroundColor: "#f0ad4e" }}
+                        className="btn-cambiar"
                         onClick={() => abrirModalCambiar(h)}
                       >
                         Cambiar
@@ -396,7 +414,9 @@ function AsignarTutorAula() {
                 : "Cambiar tutor del aula"}
             </h3>
 
-            <p><strong>Tutor actual:</strong> {filaSeleccionada?.nombre_tutor}</p>
+            <p>
+              <strong>Tutor actual:</strong> {filaSeleccionada?.nombre_tutor}
+            </p>
 
             <div className="modal-field">
               <label>Motivo del cambio/finalización</label>
@@ -456,7 +476,11 @@ function AsignarTutorAula() {
               <button
                 type="button"
                 className="aulas-btn"
-                style={{ marginRight: "8px", backgroundColor: "#ccc", color: "#000" }}
+                style={{
+                  marginRight: "8px",
+                  backgroundColor: "#ccc",
+                  color: "#000",
+                }}
                 onClick={cerrarModal}
               >
                 Cancelar

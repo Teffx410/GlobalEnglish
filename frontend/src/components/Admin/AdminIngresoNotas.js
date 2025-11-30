@@ -1,4 +1,4 @@
-// src/components/AdminIngresoNotas.js
+// src/components/Admin/AdminIngresoNotas.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
@@ -13,13 +13,17 @@ function inferTipoPrograma(grado) {
 }
 
 function AdminIngresoNotas() {
+  const rol = localStorage.getItem("rol");
+  const esSoloTutor = rol === "TUTOR";
+  const idPersonaSesion = localStorage.getItem("id_persona") || "";
+
   const [tutores, setTutores] = useState([]);
   const [aulas, setAulas] = useState([]);
   const [estudiantes, setEstudiantes] = useState([]);
   const [periodos, setPeriodos] = useState([]);
   const [componentes, setComponentes] = useState([]);
 
-  const [tutorSel, setTutorSel] = useState("");
+  const [tutorSel, setTutorSel] = useState(esSoloTutor ? idPersonaSesion : "");
   const [aulaSel, setAulaSel] = useState("");
   const [gradoAulaSel, setGradoAulaSel] = useState(null);
   const [periodoSel, setPeriodoSel] = useState("");
@@ -34,11 +38,27 @@ function AdminIngresoNotas() {
   const [cargando, setCargando] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
-  // Cargar tutores y períodos al montar
+  // Cargar tutores (solo admin/adminstrativo) y períodos al montar
   useEffect(() => {
-    axios.get(`${BASE}/admin/listar-tutores`).then(res => setTutores(res.data || []));
-    axios.get(`${BASE}/admin/listar-periodos`).then(res => setPeriodos(res.data || []));
-  }, []);
+    if (!esSoloTutor) {
+      axios
+        .get(`${BASE}/admin/listar-tutores`)
+        .then(res => setTutores(res.data || []));
+    }
+    axios
+      .get(`${BASE}/admin/listar-periodos`)
+      .then(res => setPeriodos(res.data || []));
+  }, [esSoloTutor]);
+
+  // Si es tutor, cargar sus aulas automáticamente
+  useEffect(() => {
+    if (!esSoloTutor) return;
+    const inicial = idPersonaSesion;
+    if (inicial) {
+      handleTutorChange(inicial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esSoloTutor, idPersonaSesion]);
 
   // Cambiar tutor
   const handleTutorChange = async val => {
@@ -55,8 +75,15 @@ function AdminIngresoNotas() {
       setAulas([]);
       return;
     }
-    const res = await axios.get(`${BASE}/admin/listar-aulas-tutor?id_persona=${val}`);
-    setAulas(res.data || []);
+    try {
+      const res = await axios.get(
+        `${BASE}/admin/listar-aulas-tutor?id_persona=${val}`
+      );
+      setAulas(res.data || []);
+    } catch (e) {
+      console.error("Error listando aulas del tutor:", e);
+      setAulas([]);
+    }
   };
 
   // Cambiar aula
@@ -81,8 +108,15 @@ function AdminIngresoNotas() {
     const tipo = inferTipoPrograma(grado);
     setTipoProgramaActual(tipo);
 
-    const res = await axios.get(`${BASE}/admin/listar-estudiantes-aula?id_aula=${val}`);
-    setEstudiantes(res.data || []);
+    try {
+      const res = await axios.get(
+        `${BASE}/admin/listar-estudiantes-aula?id_aula=${val}`
+      );
+      setEstudiantes(res.data || []);
+    } catch (e) {
+      console.error("Error listando estudiantes del aula:", e);
+      setEstudiantes([]);
+    }
     // componentes se cargarán cuando se elija periodo
   };
 
@@ -92,14 +126,19 @@ function AdminIngresoNotas() {
     setComponenteActivoId(null);
     setNotas({});
     if (!id_periodo || !tipo_programa) return;
-    const res = await axios.get(
-      `${BASE}/admin/listar-componentes-periodo-tipo?id_periodo=${id_periodo}&tipo_programa=${tipo_programa}`
-    );
-    const comps = res.data || [];
-    setComponentes(comps);
-    if (comps.length > 0) {
-      setComponenteActivoId(comps[0].id_componente);
-      await cargarNotasComponente(comps[0].id_componente, comps, estudiantes);
+    try {
+      const res = await axios.get(
+        `${BASE}/admin/listar-componentes-periodo-tipo?id_periodo=${id_periodo}&tipo_programa=${tipo_programa}`
+      );
+      const comps = res.data || [];
+      setComponentes(comps);
+      if (comps.length > 0) {
+        setComponenteActivoId(comps[0].id_componente);
+        await cargarNotasComponente(comps[0].id_componente, comps, estudiantes);
+      }
+    } catch (e) {
+      console.error("Error listando componentes:", e);
+      setComponentes([]);
     }
   };
 
@@ -116,7 +155,11 @@ function AdminIngresoNotas() {
   };
 
   // Cargar notas de un componente para todos los estudiantes
-  const cargarNotasComponente = async (id_componente, comps = componentes, ests = estudiantes) => {
+  const cargarNotasComponente = async (
+    id_componente,
+    comps = componentes,
+    ests = estudiantes
+  ) => {
     if (!id_componente || ests.length === 0) return;
     setCargando(true);
     try {
@@ -126,7 +169,9 @@ function AdminIngresoNotas() {
           `${BASE}/admin/obtener-nota-estudiante?id_estudiante=${est.id_estudiante}&id_componente=${id_componente}`
         );
         nuevasNotasComp[est.id_estudiante] =
-          res.data.nota !== null && res.data.nota !== undefined ? res.data.nota : "";
+          res.data.nota !== null && res.data.nota !== undefined
+            ? res.data.nota
+            : "";
       }
       setNotas(prev => ({
         ...prev,
@@ -194,12 +239,14 @@ function AdminIngresoNotas() {
       await cargarNotasComponente(componenteActivoId);
     } catch (e) {
       console.error("Error al guardar notas:", e);
-      setMsg("Error al guardar notas: " + (e.response?.data?.detail || e.message));
+      setMsg(
+        "Error al guardar notas: " + (e.response?.data?.detail || e.message)
+      );
     }
     setGuardando(false);
   };
 
-  // Cálculo de resumen: todas las notas + definitiva ponderada
+  // Cálculo de resumen
   const calcularResumen = () => {
     if (estudiantes.length === 0 || componentes.length === 0) return [];
     const resumen = [];
@@ -237,30 +284,34 @@ function AdminIngresoNotas() {
 
   return (
     <div className="aulas-panel" style={{ maxWidth: "100%", margin: "24px 20px" }}>
-      <h2 style={{ margin: "0 0 20px" }}>Ingreso de notas</h2>
+      <h2 style={{ margin: "0 0 20px" }}>
+        {esSoloTutor ? "Ingreso de mis notas" : "Ingreso de notas"}
+      </h2>
 
       {/* Filtros superiores */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{ marginBottom: 10 }}>
-          <label
-            style={{ fontWeight: "bold", display: "inline-block", minWidth: 110 }}
-          >
-            Tutor:
-          </label>
-          <select
-            value={tutorSel}
-            onChange={e => handleTutorChange(e.target.value)}
-            className="aulas-form-input"
-            style={{ maxWidth: 320 }}
-          >
-            <option value="">Seleccione tutor</option>
-            {tutores.map(t => (
-              <option value={t.id_persona} key={t.id_persona}>
-                {t.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!esSoloTutor && (
+          <div style={{ marginBottom: 10 }}>
+            <label
+              style={{ fontWeight: "bold", display: "inline-block", minWidth: 110 }}
+            >
+              Tutor:
+            </label>
+            <select
+              value={tutorSel}
+              onChange={e => handleTutorChange(e.target.value)}
+              className="aulas-form-input"
+              style={{ maxWidth: 320 }}
+            >
+              <option value="">Seleccione tutor</option>
+              {tutores.map(t => (
+                <option value={t.id_persona} key={t.id_persona}>
+                  {t.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {aulas.length > 0 && (
           <div style={{ marginBottom: 10 }}>
@@ -318,35 +369,18 @@ function AdminIngresoNotas() {
 
       {/* Tabs componentes + resumen */}
       {componentes.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            borderBottom: "1px solid #e5e7eb",
-            marginBottom: 14,
-            gap: 6,
-          }}
-        >
+        <div className="notas-tabs">
           {componentes.map(c => (
             <button
               key={c.id_componente}
               type="button"
               onClick={() => handleComponenteTab(c.id_componente)}
-              style={{
-                border: "none",
-                padding: "8px 14px",
-                borderRadius: 999,
-                cursor: "pointer",
-                background:
-                  tabActiva === "notas" && componenteActivoId === c.id_componente
-                    ? "#2563eb"
-                    : "#e5edff",
-                color:
-                  tabActiva === "notas" && componenteActivoId === c.id_componente
-                    ? "#fff"
-                    : "#1f2933",
-                fontWeight: 600,
-                fontSize: "0.93em",
-              }}
+              className={
+                "notas-tab" +
+                (tabActiva === "notas" && componenteActivoId === c.id_componente
+                  ? " active"
+                  : "")
+              }
             >
               {c.nombre} ({c.porcentaje}%)
             </button>
@@ -354,17 +388,10 @@ function AdminIngresoNotas() {
           <button
             type="button"
             onClick={() => setTabActiva("resumen")}
-            style={{
-              border: "none",
-              padding: "8px 14px",
-              borderRadius: 999,
-              cursor: "pointer",
-              marginLeft: "auto",
-              background: tabActiva === "resumen" ? "#2563eb" : "#e5edff",
-              color: tabActiva === "resumen" ? "#fff" : "#1f2933",
-              fontWeight: 600,
-              fontSize: "0.93em",
-            }}
+            className={
+              "notas-tab notas-tab-resumen" +
+              (tabActiva === "resumen" ? " active" : "")
+            }
           >
             Resumen
           </button>
@@ -482,8 +509,9 @@ function AdminIngresoNotas() {
                             max="5"
                             step="0.1"
                             value={
-                              (notas[componenteActivoId] || {})[e.id_estudiante] ??
-                              ""
+                              (notas[componenteActivoId] || {})[
+                                e.id_estudiante
+                              ] ?? ""
                             }
                             onChange={evt =>
                               handleNotaChange(

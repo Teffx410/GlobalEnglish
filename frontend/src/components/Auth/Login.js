@@ -14,38 +14,49 @@ function Login({ setToken }) {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    setError('');
+    setError("");
     try {
-      const resp = await axios.post("http://localhost:8000/login", {
-        correo: form.correo,
-        contrasena: form.contrasena
-      }, {
-        headers: { "Content-Type": "application/json" }
-      });
+      const resp = await axios.post(
+        "http://localhost:8000/login",
+        {
+          correo: form.correo,
+          contrasena: form.contrasena,
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
 
       console.log("RESPUESTA DEL BACKEND:", resp.data);
 
-      // Guarda token, rol, y nombre_user dinámicamente
       if (resp.data.ftoken && resp.data.rol && resp.data.nombre_user) {
         setToken(resp.data.ftoken);
         localStorage.setItem("token", resp.data.ftoken);
         localStorage.setItem("rol", resp.data.rol);
         localStorage.setItem("nombre_user", resp.data.nombre_user);
 
-        switch (resp.data.rol) {
-        case "ADMINISTRADOR":
-            navigate("/admin/dashboard");      // Cambia a layout anidado
-            break;
-        case "ADMINISTRATIVO":
-            navigate("/operativo-dashboard");
-            break;
-        case "TUTOR":
-            navigate("/tutor-dashboard");
-            break;
-        default:
-            navigate("/dashboard");
+        // guardar id_persona correctamente
+        if (
+          resp.data.id_persona !== undefined &&
+          resp.data.id_persona !== null
+        ) {
+          localStorage.setItem("id_persona", String(resp.data.id_persona));
+        } else {
+          localStorage.removeItem("id_persona");
         }
 
+        // Redirección según rol
+        switch (resp.data.rol) {
+          case "TUTOR":
+            navigate("/tutor/dashboard");
+            break;
+          case "ADMINISTRADOR":
+          case "ADMINISTRATIVO":
+            navigate("/admin/dashboard");
+            break;
+          default:
+            navigate("/login");
+        }
       } else {
         setError("Credenciales incorrectas.");
       }
@@ -54,7 +65,9 @@ function Login({ setToken }) {
         setError("Credenciales incorrectas.");
       } else if (
         err.code === "ERR_NETWORK" ||
-        (err.message && (err.message.includes("Network Error") || err.message.includes("ECONNREFUSED")))
+        (err.message &&
+          (err.message.includes("Network Error") ||
+            err.message.includes("ECONNREFUSED")))
       ) {
         setError("No se pudo conectar con el servidor. Verifica el backend.");
       } else {
@@ -109,4 +122,5 @@ function Login({ setToken }) {
     </div>
   );
 }
+
 export default Login;

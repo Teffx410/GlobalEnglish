@@ -1,4 +1,4 @@
-// src/components/AdminTomaAsistencia.js
+// src/components/Admin/AdminTomaAsistencia.js
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
@@ -8,10 +8,10 @@ function fechasClaseDelHorario(horario, fechaInicio, fechaFin = new Date()) {
   const diasSemana = {
     Lunes: 1,
     Martes: 2,
-    "Miércoles": 3,
+    Miércoles: 3,
     Jueves: 4,
     Viernes: 5,
-    "Sábado": 6,
+    Sábado: 6,
     Domingo: 0,
   };
   if (!horario?.dia_semana || !diasSemana.hasOwnProperty(horario.dia_semana)) {
@@ -44,8 +44,14 @@ function normalizaHora(h) {
 }
 
 function AdminTomaAsistencia() {
+  const rol = localStorage.getItem("rol");
+  const esSoloTutor = rol === "TUTOR";
+  const idPersonaSesion = localStorage.getItem("id_persona") || "";
+
   const [tutores, setTutores] = useState([]);
-  const [selectedTutor, setSelectedTutor] = useState("");
+  const [selectedTutor, setSelectedTutor] = useState(
+    esSoloTutor ? idPersonaSesion : ""
+  );
   const [aulas, setAulas] = useState([]);
   const [selectedAula, setSelectedAula] = useState("");
   const [horarios, setHorarios] = useState([]); // SOLO activos
@@ -72,20 +78,31 @@ function AdminTomaAsistencia() {
     fecha_reposicion: "",
   });
 
+  // cargar tutores (solo admin/administrativo) y motivos
   useEffect(() => {
-    axios
-      .get(`${BASE}/admin/listar-tutores`)
-      .then(r => setTutores(r.data || []))
-      .catch(() => setMsg("Error al cargar tutores."));
+    if (!esSoloTutor) {
+      axios
+        .get(`${BASE}/admin/listar-tutores`)
+        .then(r => setTutores(r.data || []))
+        .catch(() => setMsg("Error al cargar tutores."));
+    }
 
     axios
       .get(`${BASE}/admin/listar-motivos-inasistencia`)
       .then(r => setMotivos(r.data || []))
       .catch(() => setMsg("Error al cargar motivos."));
-  }, []);
+  }, [esSoloTutor]);
 
-  const handleTutorChange = async e => {
-    const id = e.target.value;
+  // si es TUTOR, cargar sus aulas automáticamente
+  useEffect(() => {
+    if (!esSoloTutor) return;
+    const inicial = idPersonaSesion;
+    if (!inicial) return;
+    handleTutorChangeInternal(inicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esSoloTutor, idPersonaSesion]);
+
+  const handleTutorChangeInternal = async id => {
     setSelectedTutor(id);
     setAulas([]);
     setSelectedAula("");
@@ -104,6 +121,11 @@ function AdminTomaAsistencia() {
     } catch {
       setMsg("Error al cargar aulas del tutor.");
     }
+  };
+
+  const handleTutorChange = e => {
+    const id = e.target.value;
+    handleTutorChangeInternal(id);
   };
 
   const handleAulaChange = async e => {
@@ -226,7 +248,7 @@ function AdminTomaAsistencia() {
   const tomarAsistencia = async e => {
     e.preventDefault();
     if (!selectedAula || !id_tutor_aula) {
-      setMsg("Debe seleccionar tutor y aula.");
+      setMsg("Debe seleccionar aula.");
       return;
     }
     setLoading(true);
@@ -307,60 +329,37 @@ function AdminTomaAsistencia() {
   };
 
   return (
-    <div
-      style={{
-        maxWidth: "100%",
-        margin: "24px 20px",
-        background: "#fafbfe",
-        borderRadius: 15,
-        boxShadow: "0 2px 10px #e1e5f3",
-        padding: "30px 40px",
-      }}
-    >
-      <h2
-        style={{
-          fontWeight: "bold",
-          fontSize: "2.3em",
-          letterSpacing: ".01em",
-        }}
-      >
-        Toma de asistencia
+    <div className="asistencia-panel">
+      <h2 className="asistencia-title">
+        {esSoloTutor ? "Mi toma de asistencia" : "Toma de asistencia"}
       </h2>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 18,
-          flexWrap: "wrap",
-          alignItems: "center",
-          marginBottom: 18,
-        }}
-      >
-        <label>
-          <b>Tutor:</b>
-          <select
-            className="aulas-form-input"
-            value={selectedTutor}
-            onChange={handleTutorChange}
-            style={{ marginLeft: 8, minWidth: 160 }}
-          >
-            <option value="">Seleccione tutor</option>
-            {tutores.map(t => (
-              <option value={t.id_persona} key={t.id_persona}>
-                {t.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="asistencia-filtros">
+        {!esSoloTutor && (
+          <label>
+            <span className="asistencia-label">Tutor:</span>
+            <select
+              className="aulas-form-input"
+              value={selectedTutor}
+              onChange={handleTutorChange}
+            >
+              <option value="">Seleccione tutor</option>
+              {tutores.map(t => (
+                <option value={t.id_persona} key={t.id_persona}>
+                  {t.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {aulas.length > 0 && (
           <label>
-            <b>Aula:</b>
+            <span className="asistencia-label">Aula:</span>
             <select
               className="aulas-form-input"
               value={selectedAula}
               onChange={handleAulaChange}
-              style={{ marginLeft: 8, minWidth: 160 }}
             >
               <option value="">Seleccione aula</option>
               {aulas.map(a => (
@@ -373,24 +372,11 @@ function AdminTomaAsistencia() {
         )}
       </div>
 
-      <div
-        style={{
-          marginTop: 24,
-          background: "#fff",
-          borderRadius: 10,
-          padding: "18px 25px",
-        }}
-      >
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: "1.02em",
-          }}
-        >
+      <div className="table-responsive">
+        <table className="aulas-table">
           <thead>
-            <tr style={{ background: "#eaf3ff" }}>
-              <th style={{ borderRadius: "8px 0 0 0" }}>Fecha</th>
+            <tr>
+              <th>Fecha</th>
               <th>Día</th>
               <th>Hora inicio</th>
               <th>Hora fin</th>
@@ -406,7 +392,7 @@ function AdminTomaAsistencia() {
               return (
                 <tr
                   key={key}
-                  style={{ background: asistencia ? "#e7fbe5" : "inherit" }}
+                  className={asistencia ? "asistencia-row-con-registro" : ""}
                 >
                   <td>{row.fecha}</td>
                   <td>{row.dia}</td>
@@ -415,20 +401,17 @@ function AdminTomaAsistencia() {
                   <td>
                     {asistencia ? (
                       <button
-                        className="aulas-btn"
-                        style={{ background: "#FF9534" }}
+                        className="asistencia-btn-modificar"
                         onClick={() => abrirModalAsistencia(row, asistencia)}
                         disabled={loading}
                       >
                         Modificar
                       </button>
                     ) : esFuturo ? (
-                      <span style={{ color: "#9aa", fontWeight: 500 }}>
-                        Futuro
-                      </span>
+                      <span className="asistencia-futuro-label">Futuro</span>
                     ) : (
                       <button
-                        className="aulas-btn"
+                        className="aulas-btn asistencia-btn-registrar"
                         onClick={() => abrirModalAsistencia(row, null)}
                         disabled={loading}
                       >
@@ -441,18 +424,13 @@ function AdminTomaAsistencia() {
             })}
           </tbody>
         </table>
-        {fechasPosibles.length === 0 && (
-          <div
-            style={{
-              padding: 15,
-              color: "#a13",
-              fontWeight: "bold",
-            }}
-          >
-            No hay horarios asignados o no hay fechas posibles.
-          </div>
-        )}
       </div>
+
+      {fechasPosibles.length === 0 && (
+        <div className="asistencia-empty">
+          No hay horarios asignados o no hay fechas posibles.
+        </div>
+      )}
 
       {modal.open && (
         <div
@@ -619,19 +597,7 @@ function AdminTomaAsistencia() {
       )}
 
       {msg && (
-        <div
-          style={{
-            color: msg.startsWith("Error") ? "#b21" : "#197d2c",
-            background: msg.startsWith("Error") ? "#fbe5e9" : "#e7fbe5",
-            fontWeight: 500,
-            marginTop: 18,
-            padding: "10px 15px",
-            borderRadius: 6,
-            border: msg.startsWith("Error")
-              ? "1.3px solid #d88490"
-              : "1.3px solid #81cc99",
-          }}
-        >
+        <div className="asistencia-msg">
           {msg}
         </div>
       )}

@@ -1,4 +1,4 @@
-// src/components/AdminCalendarioPorDias.js
+// src/components/Admin/AdminCalendarioPorDias.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
@@ -31,8 +31,13 @@ function AdminCalendarioPorDias() {
   });
   const [msgFestivo, setMsgFestivo] = useState("");
 
-  useEffect(() => { cargarFestivos(); }, [anio]);
-  useEffect(() => { cargarSemanas(); }, [anio]);
+  useEffect(() => {
+    cargarFestivos();
+  }, [anio]);
+
+  useEffect(() => {
+    cargarSemanas();
+  }, [anio]);
 
   const cargarFestivos = async () => {
     const resp = await axios.get(`${BASE}/admin/listar-festivos?anio=${anio}`);
@@ -73,7 +78,11 @@ function AdminCalendarioPorDias() {
       return;
     }
     try {
-      const res = await axios.post(`${BASE}/admin/crear-festivo`, festivoForm);
+      // usar el endpoint correcto /admin/agregar-festivo
+      const res = await axios.post(`${BASE}/admin/agregar-festivo`, {
+        fecha: festivoForm.fecha,
+        descripcion: festivoForm.descripcion,
+      });
       setMsgFestivo(res.data.msg || "Festivo registrado.");
       setFestivoForm({ fecha: "", descripcion: "" });
       cargarFestivos();
@@ -228,7 +237,7 @@ function AdminCalendarioPorDias() {
         </div>
       )}
 
-      {/* Panel festivos: solo formulario, sin listado de texto */}
+      {/* Panel festivos */}
       <div
         style={{
           background: "#f9fbff",
@@ -280,12 +289,12 @@ function AdminCalendarioPorDias() {
         )}
       </div>
 
-      {/* Calendario con columna de semanas delgada y festivos sin cambiar tamaño */}
+      {/* Calendario */}
       <div
         style={{
           marginTop: 6,
           borderRadius: 16,
-          border: "1px solid #e5e7eb",
+          border: "1px solid #e57e7eb",
           background: "#f9fbff",
           padding: 12,
         }}
@@ -302,7 +311,7 @@ function AdminCalendarioPorDias() {
             <tr>
               <th
                 style={{
-                  width: 70, // columna semana más delgada
+                  width: 70,
                   padding: "6px 4px",
                   textAlign: "left",
                   color: "#6b7280",
@@ -346,7 +355,6 @@ function AdminCalendarioPorDias() {
                   ? `Semana ${semanaInfo.numero_semana}`
                   : "";
 
-                // Columna de semana
                 celdas.push(
                   <td
                     key={`sem-${indiceSemanaMes}`}

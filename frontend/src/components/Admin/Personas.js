@@ -10,7 +10,7 @@ function Personas() {
     nombre: "",
     telefono: "",
     correo: "",
-    rol: ""
+    rol: "TUTOR"
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -21,36 +21,53 @@ function Personas() {
     nombre: "",
     telefono: "",
     correo: "",
-    rol: ""
+    rol: "TUTOR"
   });
 
+  const rolActual = localStorage.getItem("rol") || "SIN_ROL";
+  const esAdmin = rolActual === "ADMINISTRADOR";
+  const esAdministrativo = rolActual === "ADMINISTRATIVO";
 
   useEffect(() => {
     cargarPersonas();
   }, []);
 
-
   function cargarPersonas() {
-    axios.get("http://localhost:8000/personas")
-      .then(r => setPersonas(r.data))
+    axios
+      .get("http://localhost:8000/personas")
+      .then(r => {
+        // Mostrar solo tutores en la tabla
+        const soloTutores = (r.data || []).filter(p => p.rol === "TUTOR");
+        setPersonas(soloTutores);
+      })
       .catch(() => setError("Error al cargar personas"));
   }
-
 
   function agregarPersona(e) {
     e.preventDefault();
     setError("");
     setSuccess("");
-    
-    if (!form.tipo_doc || !form.num_documento || !form.nombre || !form.correo || !form.rol) {
+
+    if (!form.tipo_doc || !form.num_documento || !form.nombre || !form.correo) {
       setError("Todos los campos son obligatorios");
       return;
     }
 
-    axios.post("http://localhost:8000/personas", form)
-      .then(r => {
-        setForm({ tipo_doc: "", num_documento: "", nombre: "", telefono: "", correo: "", rol: "" });
-        setSuccess("Persona registrada correctamente");
+    // ADMINISTRATIVO y ADMIN solo pueden crear tutores desde esta pantalla
+    const payload = { ...form, rol: "TUTOR" };
+
+    axios
+      .post("http://localhost:8000/personas", payload)
+      .then(() => {
+        setForm({
+          tipo_doc: "",
+          num_documento: "",
+          nombre: "",
+          telefono: "",
+          correo: "",
+          rol: "TUTOR"
+        });
+        setSuccess("Tutor registrado correctamente");
         setTimeout(() => setSuccess(""), 3000);
         cargarPersonas();
       })
@@ -60,15 +77,15 @@ function Personas() {
       });
   }
 
-
   function eliminarPersona(id_persona) {
-    if (!window.confirm("¿Estás seguro de que deseas eliminar esta persona?")) {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este tutor?")) {
       return;
     }
-    
-    axios.delete(`http://localhost:8000/personas/${id_persona}`)
+
+    axios
+      .delete(`http://localhost:8000/personas/${id_persona}`)
       .then(() => {
-        setSuccess("Persona eliminada correctamente");
+        setSuccess("Tutor eliminado correctamente");
         setTimeout(() => setSuccess(""), 3000);
         cargarPersonas();
       })
@@ -78,7 +95,6 @@ function Personas() {
       });
   }
 
-
   function activarEdicion(persona) {
     setEditId(persona.id_persona);
     setEditForm({
@@ -87,28 +103,41 @@ function Personas() {
       nombre: persona.nombre,
       telefono: persona.telefono,
       correo: persona.correo,
-      rol: persona.rol
+      rol: "TUTOR" // forzar TUTOR
     });
     setError("");
   }
-
 
   function handleEditChange(e) {
     setEditForm({ ...editForm, [e.target.name]: e.target.value });
   }
 
-
   function guardarEdicion(id_persona) {
-    if (!editForm.tipo_doc || !editForm.num_documento || !editForm.nombre || !editForm.correo || !editForm.rol) {
+    if (
+      !editForm.tipo_doc ||
+      !editForm.num_documento ||
+      !editForm.nombre ||
+      !editForm.correo
+    ) {
       setError("Todos los campos son obligatorios");
       return;
     }
-    
-    axios.put(`http://localhost:8000/personas/${id_persona}`, editForm)
+
+    const payload = { ...editForm, rol: "TUTOR" };
+
+    axios
+      .put(`http://localhost:8000/personas/${id_persona}`, payload)
       .then(() => {
         setEditId(null);
-        setEditForm({ tipo_doc: "", num_documento: "", nombre: "", telefono: "", correo: "", rol: "" });
-        setSuccess("Persona actualizada correctamente");
+        setEditForm({
+          tipo_doc: "",
+          num_documento: "",
+          nombre: "",
+          telefono: "",
+          correo: "",
+          rol: "TUTOR"
+        });
+        setSuccess("Tutor actualizado correctamente");
         setTimeout(() => setSuccess(""), 3000);
         cargarPersonas();
       })
@@ -118,21 +147,36 @@ function Personas() {
       });
   }
 
-
   function cancelarEdicion() {
     setEditId(null);
-    setEditForm({ tipo_doc: "", num_documento: "", nombre: "", telefono: "", correo: "", rol: "" });
+    setEditForm({
+      tipo_doc: "",
+      num_documento: "",
+      nombre: "",
+      telefono: "",
+      correo: "",
+      rol: "TUTOR"
+    });
     setError("");
   }
 
+  // Solo ADMIN y ADMINISTRATIVO deberían usar esta pantalla
+  if (!esAdmin && !esAdministrativo) {
+    return (
+      <div className="sedes-panel">
+        <h2>Personas</h2>
+        <p>No tienes permisos para gestionar personas.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="sedes-panel">
-      <h2>Registrar Persona</h2>
+      <h2>Registrar Tutor</h2>
       <form className="sedes-form" onSubmit={agregarPersona}>
-        <select 
-          name="tipo_doc" 
-          value={form.tipo_doc} 
+        <select
+          name="tipo_doc"
+          value={form.tipo_doc}
           onChange={e => setForm({ ...form, tipo_doc: e.target.value })}
           required
         >
@@ -142,60 +186,83 @@ function Personas() {
           <option value="CE">C.E.</option>
           <option value="PASS">Pasaporte</option>
         </select>
-        
-        <input 
-          type="text" 
-          name="num_documento" 
-          placeholder="Número de Documento *" 
-          value={form.num_documento} 
+
+        <input
+          type="text"
+          name="num_documento"
+          placeholder="Número de Documento *"
+          value={form.num_documento}
           onChange={e => setForm({ ...form, num_documento: e.target.value })}
           required
         />
-        
-        <input 
-          type="text" 
-          name="nombre" 
-          placeholder="Nombre completo *" 
-          value={form.nombre} 
+
+        <input
+          type="text"
+          name="nombre"
+          placeholder="Nombre completo *"
+          value={form.nombre}
           onChange={e => setForm({ ...form, nombre: e.target.value })}
           required
         />
-        
-        <input 
-          type="text" 
-          name="telefono" 
-          placeholder="Teléfono" 
-          value={form.telefono} 
+
+        <input
+          type="text"
+          name="telefono"
+          placeholder="Teléfono"
+          value={form.telefono}
           onChange={e => setForm({ ...form, telefono: e.target.value })}
         />
-        
-        <input 
-          type="email" 
-          name="correo" 
-          placeholder="Correo *" 
-          value={form.correo} 
+
+        <input
+          type="email"
+          name="correo"
+          placeholder="Correo *"
+          value={form.correo}
           onChange={e => setForm({ ...form, correo: e.target.value })}
           required
         />
-        
-        <select 
-          name="rol" 
-          value={form.rol} 
-          onChange={e => setForm({ ...form, rol: e.target.value })}
-          required
-        >
-          <option value="">Rol *</option>
-          <option value="ADMINISTRADOR">Administrador</option>
-          <option value="TUTOR">Tutor</option>
-          <option value="ADMINISTRATIVO">Operativo</option>
-        </select>
-        
-        <button type="submit" className="sedes-btn">Registrar Persona</button>
+
+        {/* Rol fijo TUTOR, solo informativo */}
+        <input
+          type="text"
+          value="TUTOR"
+          disabled
+          style={{ background: "#f4f4f4", cursor: "not-allowed" }}
+        />
+
+        <button type="submit" className="sedes-btn">
+          Registrar Tutor
+        </button>
       </form>
-      
-      {error && <div style={{ color: "#a11", padding: "10px", background: "#ffefef", borderRadius: "4px", marginBottom: "10px" }}>❌ {error}</div>}
-      {success && <div style={{ color: "#237327", padding: "10px", background: "#eaffea", borderRadius: "4px", marginBottom: "10px" }}>✓ {success}</div>}
-      
+
+      {error && (
+        <div
+          style={{
+            color: "#a11",
+            padding: "10px",
+            background: "#ffefef",
+            borderRadius: "4px",
+            marginBottom: "10px"
+          }}
+        >
+          ❌ {error}
+        </div>
+      )}
+      {success && (
+        <div
+          style={{
+            color: "#237327",
+            padding: "10px",
+            background: "#eaffea",
+            borderRadius: "4px",
+            marginBottom: "10px"
+          }}
+        >
+          ✓ {success}
+        </div>
+      )}
+
+      <h3 style={{ marginTop: 20, marginBottom: 10 }}>Listado de Tutores</h3>
       <table className="sedes-table">
         <thead>
           <tr>
@@ -282,27 +349,14 @@ function Personas() {
                   persona.correo
                 )}
               </td>
-              <td>
-                {editId === persona.id_persona ? (
-                  <select
-                    name="rol"
-                    value={editForm.rol}
-                    onChange={handleEditChange}
-                    style={{ width: "100%" }}
-                  >
-                    <option value="ADMINISTRADOR">Administrador</option>
-                    <option value="TUTOR">Tutor</option>
-                    <option value="OPERATIVO">Operativo</option>
-                    <option value="ESTUDIANTE">Estudiante</option>
-                  </select>
-                ) : (
-                  persona.rol
-                )}
-              </td>
+              <td>TUTOR</td>
               <td>
                 {editId === persona.id_persona ? (
                   <>
-                    <button className="btn-editar" onClick={() => guardarEdicion(persona.id_persona)}>
+                    <button
+                      className="btn-editar"
+                      onClick={() => guardarEdicion(persona.id_persona)}
+                    >
                       Guardar
                     </button>
                     <button className="btn-cancelar" onClick={cancelarEdicion}>
@@ -311,10 +365,16 @@ function Personas() {
                   </>
                 ) : (
                   <>
-                    <button className="btn-editar" onClick={() => activarEdicion(persona)}>
+                    <button
+                      className="btn-editar"
+                      onClick={() => activarEdicion(persona)}
+                    >
                       Editar
                     </button>
-                    <button className="btn-eliminar" onClick={() => eliminarPersona(persona.id_persona)}>
+                    <button
+                      className="btn-eliminar"
+                      onClick={() => eliminarPersona(persona.id_persona)}
+                    >
                       Eliminar
                     </button>
                   </>
@@ -322,14 +382,17 @@ function Personas() {
               </td>
             </tr>
           ))}
-          {personas.length === 0 &&
-            <tr><td colSpan={8} style={{ textAlign: "center", color: "#999" }}>No hay personas registradas</td></tr>
-          }
+          {personas.length === 0 && (
+            <tr>
+              <td colSpan={8} style={{ textAlign: "center", color: "#999" }}>
+                No hay tutores registrados
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
   );
 }
-
 
 export default Personas;

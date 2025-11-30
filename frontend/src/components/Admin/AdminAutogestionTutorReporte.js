@@ -5,8 +5,14 @@ import axios from "axios";
 const BASE = "http://localhost:8000";
 
 function AdminAutogestionTutorReporte() {
+  const rol = localStorage.getItem("rol");
+  const esSoloTutor = rol === "TUTOR";
+  const idPersonaSesion = localStorage.getItem("id_persona") || "";
+
   const [tutores, setTutores] = useState([]);
-  const [tutorSel, setTutorSel] = useState("");
+  const [tutorSel, setTutorSel] = useState(
+    esSoloTutor ? idPersonaSesion : ""
+  );
 
   const [tabActiva, setTabActiva] = useState("ASISTENCIA"); // "ASISTENCIA" | "NOTAS"
 
@@ -27,16 +33,18 @@ function AdminAutogestionTutorReporte() {
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    axios
-      .get(`${BASE}/admin/listar-tutores`)
-      .then(r => setTutores(r.data || []))
-      .catch(() => setMsg("Error al cargar tutores."));
+    if (!esSoloTutor) {
+      axios
+        .get(`${BASE}/admin/listar-tutores`)
+        .then(r => setTutores(r.data || []))
+        .catch(() => setMsg("Error al cargar tutores."));
+    }
 
     axios
       .get(`${BASE}/admin/periodos`)
       .then(r => setPeriodos(r.data || []))
       .catch(() => setMsg("Error al cargar periodos."));
-  }, []);
+  }, [esSoloTutor]);
 
   // Cuando cambia el tutor, limpiar datos de notas
   useEffect(() => {
@@ -139,75 +147,60 @@ function AdminAutogestionTutorReporte() {
 
   return (
     <div className="aulas-panel" style={{ maxWidth: "100%", margin: "24px 20px" }}>
-      <h2 style={{ marginBottom: 18 }}>Reporte de asistencia y notas por tutor</h2>
+      <h2 className="asistencia-title">
+        {esSoloTutor
+          ? "Mi reporte de asistencia y notas"
+          : "Reporte de asistencia y notas por tutor"}
+      </h2>
 
-      {/* Tutor */}
-      <div
-        style={{
-          display: "flex",
-          gap: 16,
-          flexWrap: "wrap",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <label>
-          <b>Tutor:</b>
-          <select
-            className="aulas-form-input"
-            value={tutorSel}
-            onChange={e => setTutorSel(e.target.value)}
-            style={{ marginLeft: 8, minWidth: 220 }}
-          >
-            <option value="">Seleccione tutor</option>
-            {tutores.map(t => (
-              <option key={t.id_persona} value={t.id_persona}>
-                {t.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      {/* Tutor (solo admin/administrativo) */}
+      {!esSoloTutor && (
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            flexWrap: "wrap",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <label>
+            <b>Tutor:</b>
+            <select
+              className="aulas-form-input"
+              value={tutorSel}
+              onChange={e => setTutorSel(e.target.value)}
+              style={{ marginLeft: 8, minWidth: 220 }}
+            >
+              <option value="">Seleccione tutor</option>
+              {tutores.map(t => (
+                <option key={t.id_persona} value={t.id_persona}>
+                  {t.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
-      {/* Tabs principales */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          borderBottom: "1px solid #e5e7eb",
-          marginBottom: 16,
-          paddingBottom: 4,
-        }}
-      >
+      {/* Tabs principales juntos */}
+      <div className="notas-tabs">
         <button
           type="button"
           onClick={() => setTabActiva("ASISTENCIA")}
-          style={{
-            padding: "6px 16px",
-            borderRadius: 999,
-            border:
-              tabActiva === "ASISTENCIA" ? "2px solid #2563eb" : "1px solid #d1d5db",
-            background: tabActiva === "ASISTENCIA" ? "#eff6ff" : "#ffffff",
-            color: tabActiva === "ASISTENCIA" ? "#1d4ed8" : "#374151",
-            cursor: "pointer",
-            fontWeight: 500,
-          }}
+          className={
+            "notas-tab" + (tabActiva === "ASISTENCIA" ? " active" : "")
+          }
         >
           Asistencia
         </button>
+
         <button
           type="button"
           onClick={() => setTabActiva("NOTAS")}
-          style={{
-            padding: "6px 16px",
-            borderRadius: 999,
-            border:
-              tabActiva === "NOTAS" ? "2px solid #2563eb" : "1px solid #d1d5db",
-            background: tabActiva === "NOTAS" ? "#eff6ff" : "#ffffff",
-            color: tabActiva === "NOTAS" ? "#1d4ed8" : "#374151",
-            cursor: "pointer",
-            fontWeight: 500,
-          }}
+          className={
+            "notas-tab" + (tabActiva === "NOTAS" ? " active" : "")
+          }
         >
           Notas por periodo
         </button>
@@ -418,9 +411,7 @@ function AdminAutogestionTutorReporte() {
                 {notas.length === 0 && (
                   <tr>
                     <td
-                      colSpan={
-                        (notas[0]?.componentes?.length || 0) + 2
-                      }
+                      colSpan={(notas[0]?.componentes?.length || 0) + 2}
                       style={{ textAlign: "center", padding: 10 }}
                     >
                       Sin notas para el periodo seleccionado.

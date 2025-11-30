@@ -1,0 +1,397 @@
+/* src/styles/AdminLayout.css */
+
+/* ===== Fondo del sidebar por rol ===== */
+
+.layout-admin .admin-sidebar {
+  background: #1b2333;
+}
+
+/* ADMINISTRATIVO: azul petróleo oscuro */
+.layout-operativo .admin-sidebar {
+  background: #062222;
+}
+
+.layout-tutor .admin-sidebar {
+  background: #1c2633;
+}
+
+/* ===== Acentos en sidebar y KPIs ===== */
+
+/* ADMINISTRADOR (azul) */
+.layout-admin .sidebar-user-icon {
+  color: #3269fb;
+  background: #1d2330;
+}
+
+.layout-admin .sidebar-link.active,
+.layout-admin .sidebar-link:hover {
+  background: #2c3950;
+}
+
+.layout-admin .admin-kpi-card {
+  border-top: 3px solid #2563eb;
+}
+
+.layout-admin .kpi-icon {
+  color: #2563eb;
+}
+
+.layout-admin .kpi-value {
+  color: #3269fb;
+}
+
+/* ADMINISTRATIVO (teal / azul petróleo) */
+.layout-operativo .sidebar-user-icon {
+  color: #a5f3fc;           /* cyan muy claro */
+  background: #041516;
+}
+
+.layout-operativo .sidebar-link.active,
+.layout-operativo .sidebar-link:hover {
+  background: #093036;
+}
+
+.layout-operativo .admin-kpi-card {
+  border-top: 3px solid #0f766e;
+}
+
+.layout-operativo .kpi-icon {
+  color: #14b8a6;
+}
+
+.layout-operativo .kpi-value {
+  color: #0f766e;
+}
+
+/* TUTOR (violeta) */
+.layout-tutor .sidebar-user-icon {
+  color: #8b5cf6;
+  background: #1f2231;
+}
+
+.layout-tutor .sidebar-link.active,
+.layout-tutor .sidebar-link:hover {
+  background: #262744;
+}
+
+.layout-tutor .admin-kpi-card {
+  border-top: 3px solid #8b5cf6;
+}
+
+.layout-tutor .kpi-icon {
+  color: #8b5cf6;
+}
+
+.layout-tutor .kpi-value {
+  color: #7c3aed;
+}
+
+/* ===== Acentos globales ===== */
+
+.layout-admin .instituciones-btn,
+.layout-admin .sedes-btn,
+.layout-admin .aulas-btn {
+  background: #2563eb;
+}
+
+/* ADMINISTRATIVO: botones teal */
+.layout-operativo .instituciones-btn,
+.layout-operativo .sedes-btn,
+.layout-operativo .aulas-btn {
+  background: #0f766e;
+}
+
+.layout-tutor .instituciones-btn,
+.layout-tutor .sedes-btn,
+.layout-tutor .aulas-btn {
+  background: #8b5cf6;
+}
+
+.layout-admin .instituciones-table th,
+.layout-admin .aulas-table th,
+.layout-admin .sedes-table th {
+  color: #2563eb;
+}
+
+/* ADMINISTRATIVO: encabezados teal */
+.layout-operativo .instituciones-table th,
+.layout-operativo .aulas-table th,
+.layout-operativo .sedes-table th {
+  color: #0f766e;
+}
+
+.layout-tutor .instituciones-table th,
+.layout-tutor .aulas-table th,
+.layout-tutor .sedes-table th {
+  color: #8b5cf6;
+}
+
+.layout-admin .instituciones-panel,
+.layout-admin .aulas-panel,
+.layout-admin .sedes-panel {
+  box-shadow: 0 3px 16px rgba(37, 99, 235, 0.12);
+}
+
+/* ADMINISTRATIVO: sombra teal suave */
+.layout-operativo .instituciones-panel,
+.layout-operativo .aulas-panel,
+.layout-operativo .sedes-panel {
+  box-shadow: 0 3px 16px rgba(20, 184, 166, 0.18);
+}
+
+.layout-tutor .instituciones-panel,
+.layout-tutor .aulas-panel,
+.layout-tutor .sedes-panel {
+  box-shadow: 0 3px 16px rgba(139, 92, 246, 0.14);
+}
+
+/* ===== Botones Editar / Eliminar ===== */
+
+.layout-admin .btn-editar {
+  background: #e1edfe;
+  color: #2563eb;
+}
+
+.layout-admin .btn-eliminar {
+  background: #ffe2e2;
+  color: #c44e4e;
+}
+
+/* ADMINISTRATIVO: editar en teal claro */
+.layout-operativo .btn-editar {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.layout-operativo .btn-eliminar {
+  background: #ffe2e2;
+  color: #c44e4e;
+}
+
+.layout-tutor .btn-editar {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.layout-tutor .btn-eliminar {
+  background: #ffe2e2;
+  color: #c44e4e;
+}
+
+/* ===== Botón CAMBIAR por rol ===== */
+
+.layout-admin .btn-cambiar {
+  background: #e1edfe !important;
+  color: #2563eb !important;
+}
+
+/* ADMINISTRATIVO: cambiar en teal pastel */
+.layout-operativo .btn-cambiar {
+  background: #ccfbf1 !important;
+  color: #0f766e !important;
+}
+
+/* TUTOR: violeta */
+.layout-tutor .btn-cambiar {
+  background: #ede9fe !important;
+  color: #7c3aed !important;
+}
+
+/* Festivos por rol */
+
+.layout-admin .festivos-day-header {
+  color: #2563eb;
+}
+
+/* ADMINISTRATIVO: teal */
+.layout-operativo .festivos-day-header {
+  color: #0f766e;
+}
+
+.layout-tutor .festivos-day-header {
+  color: #8b5cf6;
+}
+
+.layout-admin .festivos-month-label {
+  color: #2563eb;
+}
+
+.layout-operativo .festivos-month-label {
+  color: #0f766e;
+}
+
+.layout-tutor .festivos-month-label {
+  color: #8b5cf6;
+}
+
+.layout-admin .festivos-day-box.hoy {
+  border-color: #2563eb;
+}
+
+.layout-operativo .festivos-day-box.hoy {
+  border-color: #14b8a6;
+}
+
+.layout-tutor .festivos-day-box.hoy {
+  border-color: #8b5cf6;
+}
+
+.layout-admin .festivos-today-label {
+  color: #2563eb;
+}
+
+.layout-operativo .festivos-today-label {
+  color: #0f766e;
+}
+
+.layout-tutor .festivos-today-label {
+  color: #8b5cf6;
+}
+
+/* Tabs ingreso notas por rol */
+
+.layout-admin .notas-tab {
+  background: #e5edff;
+}
+.layout-admin .notas-tab.active {
+  background: #2563eb;
+}
+
+/* ADMINISTRATIVO: tabs teal suaves */
+.layout-operativo .notas-tab {
+  background: #f0fdfa;
+}
+.layout-operativo .notas-tab.active {
+  background: #0f766e;
+  color: #022c22;
+}
+
+/* TUTOR: violeta */
+.layout-tutor .notas-tab {
+  background: #ede9fe;
+}
+.layout-tutor .notas-tab.active {
+  background: #8b5cf6;
+}
+
+/* Tabs asistencia por rol */
+
+.layout-admin .asist-tab.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #2563eb;
+}
+
+/* ADMINISTRATIVO: teal */
+.layout-operativo .asist-tab.active {
+  background: #f0fdfa;
+  color: #115e59;
+  border-color: #0f766e;
+}
+
+/* TUTOR (violeta) */
+.layout-tutor .asist-tab.active {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #8b5cf6;
+}
+
+/* Toma asistencia por rol */
+
+/* ADMINISTRATIVO: fila con registro, teal muy claro */
+.layout-operativo .asistencia-row-con-registro {
+  background: #f0fdfa;
+}
+
+/* TUTOR: lila claro */
+.layout-tutor .asistencia-row-con-registro {
+  background: #ede9fe;
+}
+
+/* ADMINISTRATIVO: botón Modificar */
+.layout-operativo .asistencia-btn-modificar {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+/* TUTOR */
+.layout-tutor .asistencia-btn-modificar {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+/* Encabezados tablas asistencia/aulas */
+
+.layout-admin .asistencia-table th {
+  color: #2563eb;
+}
+
+.layout-operativo .asistencia-table th {
+  color: #0f766e;
+}
+
+.layout-tutor .asistencia-table th {
+  color: #8b5cf6;
+}
+
+.layout-admin .aulas-table th {
+  color: #2563eb;
+}
+
+.layout-operativo .aulas-table th {
+  color: #0f766e;
+}
+
+.layout-tutor .aulas-table th {
+  color: #8b5cf6;
+}
+
+/* Toolbar calendario por rol */
+
+.layout-operativo .rbc-toolbar button.rbc-active {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #e0fdfa;
+}
+
+.layout-tutor .rbc-toolbar button.rbc-active {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+/* Repetición de tabs activos para compatibilidad */
+
+.layout-admin .notas-tab.active {
+  background: #2563eb;
+}
+
+.layout-operativo .notas-tab.active {
+  background: #0f766e;
+}
+
+.layout-tutor .notas-tab.active {
+  background: #8b5cf6;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 14px 10px;
+}
+
+/* Tamaño controlado SOLO para el logo del sidebar */
+.sidebar-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: invert(1) brightness(1.3); /* lo vuelve claro sobre fondo oscuro */
+}
+
+
+.sidebar-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #f9fafb;
+}

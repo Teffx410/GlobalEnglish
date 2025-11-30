@@ -1,17 +1,13 @@
-// src/components/Dashboard/AdminLayout.js
+// src/components/Dashboard/TutorLayout.js
 import React from "react";
 import { Outlet } from "react-router-dom";
 import AdminSidebar from "./AdminSidebar";
 import "../../styles/AdminDashboard.css";
 import "../../styles/AdminLayout.css";
 
-function AdminLayout() {
-  const rol = localStorage.getItem("rol") || "SIN_ROL";
-
-  let layoutClass = "";
-  if (rol === "ADMINISTRADOR") layoutClass = "layout-admin";
-  else if (rol === "ADMINISTRATIVO") layoutClass = "layout-operativo";
-  else layoutClass = "layout-admin"; // fallback
+function TutorLayout() {
+  // Forzamos la clase de layout para tutor
+  const layoutClass = "layout-tutor";
 
   return (
     <div className={`admin-dashboard-container ${layoutClass}`}>
@@ -23,4 +19,4 @@ function AdminLayout() {
   );
 }
 
-export default AdminLayout;
+export default TutorLayout;

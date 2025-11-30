@@ -235,6 +235,16 @@
   margin-right: 5px;
   cursor: pointer;
 }
+.btn-cambiar {
+  background: #f0ad4e;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-weight: bold;
+  padding: 6px 18px;
+  margin-left: 6px;
+  cursor: pointer;
+}
 .btn-eliminar {
   background: #ffe2e2;
   color: #c44e4e;
@@ -575,4 +585,448 @@
 .rbc-btn-group > button.rbc-active {
   background: #3269fb !important;
   color: #fff !important;
+}
+
+/* Festivos base */
+
+.festivos-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 16px;
+  background: #f4f7fe;
+  padding: 10px 14px;
+  border-radius: 14px;
+}
+
+.festivos-year,
+.festivos-month {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.festivos-year-input {
+  width: 90px;
+  text-align: center;
+}
+
+.festivos-month-label {
+  font-weight: bold;
+  font-size: 1.05em;
+  min-width: 120px;
+  text-align: center;
+}
+
+.festivos-title {
+  margin-bottom: 4px;
+}
+
+.festivos-subtitle {
+  font-size: 0.95em;
+  color: #6b7280;
+}
+
+.festivos-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.festivos-desc-input {
+  min-width: 220px;
+}
+
+.festivos-calendar {
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: #f9fbff;
+  padding: 14px;
+}
+
+.festivos-table {
+  border-collapse: separate;
+  border-spacing: 6px;
+  width: 100%;
+  font-size: 0.96em;
+}
+
+.festivos-day-header {
+  padding: 6px 4px;
+  text-align: center;
+  font-weight: 700;
+  background: #eef3ff;
+  border-radius: 10px;
+  color: #2563eb;
+}
+
+.festivos-day-box {
+  width: 100%;
+  height: 78px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px 6px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.festivos-day-box.hoy {
+  border: 1.5px solid #2563eb;
+  background: #e0f2fe;
+}
+
+.festivos-day-box.festivo {
+  border: 1.5px solid #f97373;
+  background: #fff5f5;
+}
+
+.festivos-day-number {
+  font-weight: 600;
+  color: #111827;
+}
+
+.festivos-day-number.festivo {
+  color: #b91c1c;
+}
+
+.festivos-today-label {
+  font-size: 0.7em;
+  color: #2563eb;
+  margin-top: 2px;
+}
+
+.festivos-day-desc {
+  margin-top: auto;
+  font-size: 0.7em;
+  color: #b91c1c;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tabs ingreso de notas */
+
+.notas-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 14px;
+  gap: 6px;
+}
+
+.notas-tab {
+  border: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  background: #e5edff;
+  color: #1f2933;
+  font-weight: 600;
+  font-size: 0.93em;
+}
+
+.notas-tab-resumen {
+  margin-left: auto;
+}
+
+.notas-tab.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+/* Tabs toma de asistencia (estudiantes) */
+
+.asist-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 6px;
+}
+
+.asist-tab {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+
+.asist-tab.active {
+  border-width: 2px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #2563eb;
+}
+
+/* Panel toma de asistencia */
+
+.asistencia-panel {
+  max-width: 100%;
+  margin: 24px 20px;
+  background: #fafbfe;
+  border-radius: 15px;
+  box-shadow: 0 2px 10px #e1e5f3;
+  padding: 24px 28px;
+}
+
+/* Título normal, sin negrita */
+.asistencia-title {
+  margin-bottom: 4px;
+}
+
+
+.asistencia-filtros {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.asistencia-table-wrapper {
+  margin-top: 10px;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+.asistencia-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;       /* reduce tamaño de fuente de la tabla */
+}
+
+.asistencia-table thead tr {
+  background: #eaf3ff;
+}
+
+.asistencia-table th,
+.asistencia-table td {
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.asistencia-table th:first-child {
+  border-radius: 8px 0 0 0;
+}
+
+.asistencia-table th:last-child {
+  border-radius: 0 8px 0 0;
+}
+
+.asistencia-row-con-registro {
+  background: #ecfdf3;     /* verde muy suave */
+}
+
+/* Botón plano para Modificar, mismo ancho que Registrar/Eliminar */
+.asistencia-btn-modificar {
+  min-width: 130px;          /* igual que .asistencia-btn-registrar */
+  padding: 6px 14px;
+  background: #e5edff;
+  color: #1d4ed8;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;        /* esquinas suaves, NO pastilla */
+  font-weight: 500;
+  font-size: 0.9rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.asistencia-btn-modificar:hover:enabled {
+  background: #dbeafe;
+}
+
+/* Registrar mantiene el estilo de botón principal pero con mismo ancho */
+.asistencia-btn-registrar {
+  min-width: 130px;
+  margin: 0; 
+}
+
+.asistencia-futuro-label {
+  color: #9aa;
+  font-weight: 500;
+}
+
+.asistencia-empty {
+  padding: 12px;
+  color: #a13;
+  font-weight: bold;
+  font-size: 0.9em;
+}
+
+.asistencia-msg {
+  color: #197d2c;
+  background: #e7fbe5;
+  font-weight: 500;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1.3px solid #81cc99;
+}
+.asistencia-msg:before {
+  content: "";
+}
+
+.asistencia-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.asistencia-table thead tr {
+  background: #f3f4f6;       /* fondo gris muy suave */
+}
+
+.asistencia-table th,
+.asistencia-table td {
+  padding: 8px 10px;
+  text-align: left;
+}
+
+/* color base neutro para th, lo sobreescribimos por rol */
+.asistencia-table th {
+  color: #111827;
+  font-weight: 500;
+}
+
+/* Filas con registro en toma de asistencia (aula) */
+.asistencia-row-con-registro {
+  background: #e6ffed;       /* mismo verde suave que usas en otras vistas */
+}
+
+/* Botones de acción */
+.asistencia-btn-modificar {
+  background: #e0edff;
+  color: #1d4ed8;
+}
+
+
+
+/* Label “Futuro” */
+.asistencia-futuro-label {
+  color: #9aa;
+  font-weight: 500;
+}
+
+/* Mensaje inferior */
+.asistencia-msg {
+  color: #197d2c;
+  background: #e7fbe5;
+  font-weight: 500;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1.3px solid #81cc99;
+}
+
+/* Título y filtros ya unificados */
+.asistencia-panel {
+  max-width: 100%;
+  margin: 24px 20px;
+  background: #fafbfe;
+  border-radius: 15px;
+  box-shadow: 0 2px 10px #e1e5f3;
+  padding: 24px 28px;
+}
+
+.asistencia-title {
+  margin-bottom: 4px;
+}
+
+.asistencia-filtros {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.asistencia-label {
+  margin-right: 6px;
+  font-weight: 500;
+}
+
+.tutor-calendar-wrapper {
+  height: 600px;
+  margin-top: 24px;
+  border-radius: 17px;
+  overflow: hidden;
+  background: #f9fbff;               /* mismo fondo que otros paneles */
+  box-shadow: 0 3px 16px rgba(15, 23, 42, 0.06);
+}
+
+/* Toolbar del calendario */
+.rbc-toolbar {
+  padding: 8px 16px;
+  font-size: 0.9em;
+  background: #f3f4ff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.rbc-toolbar button {
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  font-weight: 500;
+}
+
+.rbc-toolbar button.rbc-active {
+  background: var(--event-bg, #2563eb);
+  color: #ffffff;
+  border-color: var(--event-bg, #2563eb);
+}
+
+/* Bordes y líneas internas */
+.rbc-time-view,
+.rbc-time-header,
+.rbc-time-content {
+  border-color: #e5e7eb;
+}
+
+.rbc-time-header-cell {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.rbc-time-slot {
+  border-top: 1px solid #eef2ff;
+}
+
+.notas-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 14px;
+  gap: 6px;
+}
+
+.notas-tab {
+  border: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  background: #e5edff;
+  color: #1f2933;
+  font-weight: 600;
+  font-size: 0.93em;
+}
+
+.notas-tab.active {
+  background: #2563eb;
+  color: #fff;
 }
