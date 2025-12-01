@@ -5,62 +5,86 @@ import oracledb
 from dotenv import load_dotenv
 from contextlib import contextmanager
 
-# Carga las variables de entorno
+# ================================
+#  CARGA DE VARIABLES DE ENTORNO
+# ================================
 load_dotenv()
 
-# --- Configuración de Conexión ---
-# Asegúrate de que estas variables estén definidas en tu archivo .env
-USER = os.getenv("DB_USER", "GLOBALENGLISH")
-PASSWORD = os.getenv("DB_PASS", "oracle")
-DSN = os.getenv("DB_DSN", "localhost:1521/XEPDB1")
+DB_USER = os.getenv("DB_USER", "GLOBALENGLISH")
+DB_PASS = os.getenv("DB_PASS", "oracle")
+DB_DSN  = os.getenv("DB_DSN", "localhost:1521/XEPDB1")
 
-# print("Conexión:", USER, PASSWORD, DSN) # Se comenta para evitar logs innecesarios
-# print("Conexión:", USER, PASSWORD, DSN)
-
+# ================================
+#  POOL DE CONEXIONES GLOBAL
+# ================================
 _pool = None
 
+
 def init_pool():
-    """Inicializa el pool de conexiones si no existe."""
+    """
+    Inicializa el pool de conexiones (solo una vez).
+    """
     global _pool
+
     if _pool is None:
-        # Nota: La librería oracledb maneja la configuración del pool.
-        _pool = oracledb.create_pool(user=USER, password=PASSWORD, dsn=DSN,
-                                     min=1, max=5, increment=1)
+        _pool = oracledb.create_pool(
+            user=DB_USER,
+            password=DB_PASS,
+            dsn=DB_DSN,
+            min=1,
+            max=5,
+            increment=1,
+            homogeneous=True
+        )
+
     return _pool
 
+
 def get_conn():
-    """Adquiere una conexión del pool."""
+    """
+    Obtiene una conexión activa desde el pool.
+    """
     pool = init_pool()
-    return pool.acquire()
+    conn = pool.acquire()
+    return conn
+
 
 def release_conn(conn):
-    """Libera una conexión al pool."""
-    pool = init_pool()
-    # Verifica si la conexión existe y tiene un pool asociado antes de liberarla.
+    """
+    Libera una conexión activa al pool.
+    """
     if conn:
-        pool.release(conn)
+        try:
+            pool = init_pool()
+            pool.release(conn)
+        except Exception:
+            pass  # Evita errores silenciosamente si ya fue liberada
 
+
+# ================================
+#  CONTEXT MANAGER DE SESIÓN
+# ================================
 @contextmanager
 def db_session():
     """
-    Context manager para manejar la conexión, transacciones y liberación
-    automáticamente usando el pool.
-    
-    Uso: with db_session() as conn: ...
+    Maneja automáticamente:
+    - adquisición de conexión,
+    - commit o rollback,
+    - liberación al pool.
+
+    Uso:
+        with db_session() as conn:
+            cur = conn.cursor()
+            cur.execute(...)
     """
     conn = None
     try:
-        # Adquirir conexión del pool
         conn = get_conn()
         yield conn
-        # Si no hay excepción, hacer commit
         conn.commit()
-    except Exception:
-        # Si hay excepción, hacer rollback
+    except Exception as e:
         if conn:
             conn.rollback()
-        # Vuelve a elevar la excepción para que el llamador la maneje
-        raise
+        raise e
     finally:
-        # Liberar la conexión al pool
         release_conn(conn)
