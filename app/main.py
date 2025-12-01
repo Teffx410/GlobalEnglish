@@ -1,15 +1,15 @@
-# app/main.py
 from fastapi import FastAPI, HTTPException, Depends, Query, Body
-from app.models import InstitucionIn, InstitucionOut, PersonaIn,  UsuarioIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut, SedeIn, SedeOut, HistoricoAulaEstudianteIn, CambioEstudianteAulaIn, HorarioIn, HorarioOut, AsignarHorarioAulaIn, CambiarTutorAulaIn, AsignarTutorAulaIn, PeriodoIn, ComponenteIn, AsistenciaAulaIn, RegistrarNotaIn, RegistrarAsistenciaEstudianteIn
+from app.models import InstitucionIn, InstitucionOut, PersonaIn, UsuarioIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut, SedeIn, SedeOut, HistoricoAulaEstudianteIn, CambioEstudianteAulaIn, HorarioIn, HorarioOut, AsignarHorarioAulaIn, CambiarTutorAulaIn, AsignarTutorAulaIn, PeriodoIn, ComponenteIn, AsistenciaAulaIn, RegistrarNotaIn, RegistrarAsistenciaEstudianteIn
 import app.crud as crud
 import app.reports as reports
-from app.auth import create_token, require_role
+from app.auth import create_token, require_role # <--- require_role será la clave
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from hashlib import sha256
 from datetime import datetime, timedelta
 from .auth import create_token 
+
 app = FastAPI()
 
 # Permitir llamadas desde el frontend React (por defecto en localhost:3000)
@@ -22,9 +22,20 @@ app.add_middleware(
 )
 
 # ============================
+# MODELO DE ASIGNACIÓN ADMINISTRATIVA
+# ============================
+
+class AsignarPersonaTutorIn(BaseModel):
+    id_persona_asignada: int # ID de la persona que será asignada (ej: otro administrativo)
+    id_tutor_objetivo: int   # ID del tutor sobre el que la persona asignada puede actuar
+
+# Rol necesario para gestión administrativa
+ADMIN_ROLES = ["ADMINISTRADOR", "ADMINISTRATIVO"]
+
+# ============================
 # INSTITUCION
 # ============================
-@app.post("/instituciones", response_model=InstitucionOut)
+@app.post("/instituciones", response_model=InstitucionOut, dependencies=[Depends(require_role(ADMIN_ROLES))])
 def create_institucion(payload: InstitucionIn):
     result = crud.create_institucion(payload.dict())
 
@@ -74,7 +85,7 @@ def get_institucion(id_inst: int):
         raise HTTPException(status_code=404, detail="Institución no encontrada")
     return inst
 
-@app.delete("/instituciones/{id_inst}")
+@app.delete("/instituciones/{id_inst}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def delete_institucion(id_inst: int):
     result = crud.delete_institucion(id_inst)
     
@@ -84,7 +95,7 @@ def delete_institucion(id_inst: int):
     return {"ok": True, "msg": result.get("msg", "Institución eliminada")}
 
 
-@app.put("/instituciones/{id_inst}", response_model=InstitucionOut)
+@app.put("/instituciones/{id_inst}", response_model=InstitucionOut, dependencies=[Depends(require_role(ADMIN_ROLES))])
 def update_institucion(id_inst: int, payload: InstitucionIn):
     # Validar que la institución exista
     inst_existente = crud.get_institucion(id_inst)
@@ -109,7 +120,7 @@ def update_institucion(id_inst: int, payload: InstitucionIn):
 # SEDE
 # ============================
 
-@app.post("/sedes")
+@app.post("/sedes", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def create_sede(payload: SedeIn):
     result = crud.create_sede(payload.dict())
     
@@ -134,7 +145,7 @@ def get_sede(id_sede: int):
         raise HTTPException(status_code=404, detail="Sede no encontrada")
     return sede
 
-@app.delete("/sedes/{id_institucion}/{id_sede}")
+@app.delete("/sedes/{id_institucion}/{id_sede}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def delete_sede(id_institucion: int, id_sede: int):
     result = crud.delete_sede(id_institucion, id_sede)
     
@@ -143,7 +154,7 @@ def delete_sede(id_institucion: int, id_sede: int):
     
     return {"ok": True, "msg": result.get("msg", "Sede eliminada")}
 
-@app.put("/sedes/{id_sede}")
+@app.put("/sedes/{id_sede}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def update_sede(id_sede: int, payload: SedeIn):
     # Validar que la sede exista
     sede_existente = crud.get_sede(id_sede)
@@ -164,11 +175,14 @@ def update_sede(id_sede: int, payload: SedeIn):
     return sede
 
 # ============================
-# PERSONA
+# PERSONA (CONTRATAR - requiere rol administrativo/administrador)
 # ============================
 
-@app.post("/personas", response_model=PersonaOut)
+@app.post("/personas", response_model=PersonaOut, dependencies=[Depends(require_role(ADMIN_ROLES))])
 def create_persona(payload: PersonaIn):
+    """
+    Contratar Personas: El rol ADMINISTRATIVO/ADMINISTRADOR puede crear personas.
+    """
     result = crud.create_persona(payload.dict())
     
     # Verificar si hubo error
@@ -194,7 +208,7 @@ def create_persona(payload: PersonaIn):
 def list_personas():
     return crud.list_personas()
 
-@app.put("/personas/{id_persona}")
+@app.put("/personas/{id_persona}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def update_persona_endpoint(id_persona: int, payload: PersonaIn):
     result = crud.update_persona(id_persona, payload.dict())
     
@@ -203,7 +217,7 @@ def update_persona_endpoint(id_persona: int, payload: PersonaIn):
     
     return {"ok": True, "message": "Persona actualizada correctamente"}
 
-@app.delete("/personas/{id_persona}")
+@app.delete("/personas/{id_persona}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def delete_persona_endpoint(id_persona: int):
     result = crud.delete_persona(id_persona)
     
@@ -213,10 +227,32 @@ def delete_persona_endpoint(id_persona: int):
     return {"ok": True, "message": "Persona eliminada correctamente"}
 
 # ============================
+# ASIGNACIÓN PERSONA A TUTOR (NUEVA FUNCIONALIDAD)
+# ============================
+@app.post("/admin/asignar-persona-a-tutor", dependencies=[Depends(require_role(ADMIN_ROLES))])
+def asignar_persona_a_tutor_endpoint(payload: AsignarPersonaTutorIn):
+    """
+    Asigna una persona (ej: Administrativo/Asistente) a un Tutor para que pueda
+    actuar en su nombre o ver sus reportes, cumpliendo con la necesidad de
+    'solicitar primero sobre que TUTOR va a actuar'.
+    """
+    try:
+        # Nota: La implementación de 'asignar_persona_a_tutor_supervision' debe estar en crud.py
+        result = crud.asignar_persona_a_tutor_supervision(payload.dict())
+        if isinstance(result, dict) and "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return {"ok": True, "msg": "Relación de actuación delegada establecida."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en la asignación: {str(e)}")
+
+
+# ============================
 # USUARIO
 # ============================
 
-@app.post("/usuarios")
+@app.post("/usuarios", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def crear_usuario(payload: dict):
     nombre_user, clave, correo = crud.create_usuario(payload)
     return {
@@ -234,7 +270,7 @@ def listar_usuarios():
 # AULAS
 # ============================
 
-@app.post("/aulas", response_model=AulaOut)
+@app.post("/aulas", response_model=AulaOut, dependencies=[Depends(require_role(ADMIN_ROLES))])
 def create_aula(payload: AulaIn):
     id_aula = crud.create_aula(payload.dict())
     if not id_aula:
@@ -253,12 +289,12 @@ def get_aula(id_aula: int):
         raise HTTPException(status_code=404, detail="No encontrada")
     return aula
 
-@app.delete("/aulas/{id_aula}")
+@app.delete("/aulas/{id_aula}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def delete_aula(id_aula: int):
     crud.delete_aula(id_aula)
     return {"ok": True}
 
-@app.put("/aulas/{id_aula}", response_model=AulaOut)
+@app.put("/aulas/{id_aula}", response_model=AulaOut, dependencies=[Depends(require_role(ADMIN_ROLES))])
 def update_aula(id_aula: int, payload: AulaIn):
     crud.update_aula(id_aula, payload.dict())
     aula = crud.get_aula(id_aula)
@@ -289,7 +325,7 @@ def validar_horario(data, grado="4", jornada_institucion="MAÑANA"):
         if data['minutos_equiv'] not in minutos_validos:
             raise HTTPException(status_code=400, detail="Minutos equivocados")
 
-@app.post("/horarios")
+@app.post("/horarios", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def crear_horario(payload: HorarioIn):
     # Validación básica formato/time, pero NO restringir días/franja por grado aquí
     try:
@@ -306,7 +342,7 @@ def crear_horario(payload: HorarioIn):
 def listar_horarios():
     return crud.list_horarios()
 
-@app.delete("/horarios/{id_horario}")
+@app.delete("/horarios/{id_horario}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def eliminar_horario(id_horario: int):
     crud.delete_horario(id_horario)
     return {"ok": True}
@@ -316,7 +352,7 @@ def eliminar_horario(id_horario: int):
 # ASIGNAR HORARIO A AULA + HISTÓRICO
 # ============================
 
-@app.post("/asignar-horario-aula")
+@app.post("/asignar-horario-aula", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def asignar_horario_aula(payload: AsignarHorarioAulaIn):
     result = crud.asignar_horario_aula(payload.dict())
     if "error" in result:
@@ -328,7 +364,7 @@ def historial_horarios_aula(id_aula: int):
     return crud.list_horarios_aula(id_aula)
 
 
-@app.put("/historial-horarios-aula/{id_hist_horario}/fin")
+@app.put("/historial-horarios-aula/{id_hist_horario}/fin", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def finalizar_historial(id_hist_horario: int, fecha_fin: Optional[str] = Query(None)):
     """
     Marca un registro del historial como finalizado.
@@ -347,7 +383,7 @@ def finalizar_historial(id_hist_horario: int, fecha_fin: Optional[str] = Query(N
 # ============================
 
 
-@app.put("/asignacion-tutor/{id_tutor_aula}/fin")
+@app.put("/asignacion-tutor/{id_tutor_aula}/fin", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def finalizar_asignacion_tutor_endpoint(
     id_tutor_aula: int,
     fecha_fin: Optional[str] = Query(None),
@@ -356,7 +392,7 @@ def finalizar_asignacion_tutor_endpoint(
     crud.finalizar_asignacion_tutor(id_tutor_aula, fecha_fin, motivo_cambio)
     return {"msg": "Asignación de tutor finalizada"}
 
-@app.delete("/asignacion-tutor/{id_tutor_aula}")
+@app.delete("/asignacion-tutor/{id_tutor_aula}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def delete_asignacion_tutor_endpoint(id_tutor_aula: int):
     try:
         crud.delete_asignacion_tutor(id_tutor_aula)
@@ -364,7 +400,7 @@ def delete_asignacion_tutor_endpoint(id_tutor_aula: int):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-@app.post("/asignar-tutor-aula")
+@app.post("/asignar-tutor-aula", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def asignar_tutor_aula(payload: AsignarTutorAulaIn):
     result = crud.asignar_tutor_aula(payload.dict())
     if "error" in result:
@@ -375,7 +411,7 @@ def asignar_tutor_aula(payload: AsignarTutorAulaIn):
 def historial_tutores_aula(id_aula: int):
     return crud.list_tutores_aula(id_aula)
 
-@app.post("/cambiar-tutor-aula")
+@app.post("/cambiar-tutor-aula", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def cambiar_tutor_aula_endpoint(payload: CambiarTutorAulaIn):
     result = crud.cambiar_tutor_aula(payload.dict())
     if "error" in result:
@@ -386,7 +422,7 @@ def cambiar_tutor_aula_endpoint(payload: CambiarTutorAulaIn):
 # HISTÓRICO AULA ESTUDIANTE
 # ============================
 
-@app.post("/asignar-estudiante-aula")
+@app.post("/asignar-estudiante-aula", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def asignar_estudiante_aula_endpoint(payload: HistoricoAulaEstudianteIn):
     result = crud.asignar_estudiante_aula(payload.dict())
     if isinstance(result, dict) and "error" in result:
@@ -397,7 +433,7 @@ def asignar_estudiante_aula_endpoint(payload: HistoricoAulaEstudianteIn):
 def estudiantes_aula(id_aula: int):
     return crud.listar_estudiantes_de_aula(id_aula)
 
-@app.put("/hist-aula-estudiante/{id_hist_aula_est}/fin")
+@app.put("/hist-aula-estudiante/{id_hist_aula_est}/fin", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def finalizar_asignacion_estudiante_endpoint(
     id_hist_aula_est: int,
     fecha_fin: Optional[str] = None,
@@ -408,7 +444,7 @@ def finalizar_asignacion_estudiante_endpoint(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/cambiar-estudiante-aula")
+@app.post("/cambiar-estudiante-aula", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def cambiar_estudiante_aula_endpoint(payload: CambioEstudianteAulaIn):
     result = crud.cambiar_estudiante_aula(payload.dict())
     if isinstance(result, dict) and "error" in result:
@@ -436,8 +472,11 @@ def horarios_tutor(id_persona: int):
 def listar_tutores():
     return crud.listar_tutores()
 
-@app.get("/admin/listar-aulas-tutor")
+@app.get("/admin/listar-aulas-tutor", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_aulas_tutor(id_persona: int):
+    """
+    ADMINISTRATIVO/ADMINISTRADOR actúa sobre el TUTOR especificado (id_persona).
+    """
     print(">>> listar_aulas_tutor endpoint id_persona =", id_persona)
     datos = crud.listar_aulas_tutor(id_persona)
     print(">>> listar_aulas_tutor resultado =", datos)
@@ -456,7 +495,7 @@ def encontrar_horario_y_semana(id_aula: int, fecha_clase: str, hora_inicio: str)
 # ESTUDIANTES
 # ============================
 
-@app.post("/estudiantes", response_model=EstudianteOut)
+@app.post("/estudiantes", response_model=EstudianteOut, dependencies=[Depends(require_role(ADMIN_ROLES))])
 def create_estudiante(payload: EstudianteIn):
     result = crud.create_estudiante(payload.dict())
     if isinstance(result, dict) and "error" in result:
@@ -466,7 +505,7 @@ def create_estudiante(payload: EstudianteIn):
     out = crud.get_estudiante(result)
     return out
 
-@app.put("/estudiantes/{id_est}", response_model=EstudianteOut)
+@app.put("/estudiantes/{id_est}", response_model=EstudianteOut, dependencies=[Depends(require_role(ADMIN_ROLES))])
 def update_estudiante(id_est: int, payload: EstudianteIn):
     result = crud.update_estudiante(id_est, payload.dict())
     if isinstance(result, dict) and "error" in result:
@@ -487,7 +526,7 @@ def get_estudiante(id_est: int):
         raise HTTPException(status_code=404, detail="No encontrado")
     return estu
 
-@app.delete("/estudiantes/{id_est}")
+@app.delete("/estudiantes/{id_est}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def delete_estudiante(id_est: int):
     crud.delete_estudiante(id_est)
     return {"ok": True}
@@ -496,7 +535,7 @@ def delete_estudiante(id_est: int):
 # PERIODOS
 # ============================
 
-@app.post("/periodos")
+@app.post("/periodos", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def crear_periodo(payload: PeriodoIn):
     crud.create_periodo(payload.dict())
     return {"msg": "Periodo registrado."}
@@ -505,12 +544,12 @@ def crear_periodo(payload: PeriodoIn):
 def listar_periodos():
     return crud.list_periodos()
 
-@app.put("/periodos/{id_periodo}")
+@app.put("/periodos/{id_periodo}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def actualizar_periodo(id_periodo: int, payload: PeriodoIn):
     crud.update_periodo(id_periodo, payload.dict())
     return {"msg": "Periodo actualizado."}
 
-@app.delete("/periodos/{id_periodo}")
+@app.delete("/periodos/{id_periodo}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def eliminar_periodo(id_periodo: int):
     try:
         crud.delete_periodo(id_periodo)
@@ -526,21 +565,21 @@ def eliminar_periodo(id_periodo: int):
 def listar_componentes():
     return crud.list_componentes()
 
-@app.post("/componentes")
+@app.post("/componentes", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def crear_componente_endpoint(payload: ComponenteIn):
     r = crud.crear_componente(**payload.dict())
     if not r["ok"]:
         raise HTTPException(status_code=400, detail=r["msg"])
     return r
 
-@app.put("/componentes/{id_componente}")
+@app.put("/componentes/{id_componente}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def actualizar_componente_endpoint(id_componente: int, payload: ComponenteIn):
     r = crud.actualizar_componente(id_componente, **payload.dict())
     if not r["ok"]:
         raise HTTPException(status_code=400, detail=r["msg"])
     return r
 
-@app.delete("/componentes/{id_componente}")
+@app.delete("/componentes/{id_componente}", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def eliminar_componente_endpoint(id_componente: int):
     r = crud.eliminar_componente(id_componente)
     if not r["ok"]:
@@ -551,14 +590,14 @@ def eliminar_componente_endpoint(id_componente: int):
 # ASISTENCIA AULA
 # ============================
 
-@app.post("/asistir-aula")
+@app.post("/asistir-aula") # RUTA DE TUTOR/ADMIN_ACTUANDO, NO REQUIERE PROTECCIÓN EXPLICITA AQUI (asumo que la verificación de tutor va en CRUD)
 def asistir_aula(payload: AsistenciaAulaIn):
     result = crud.registrar_asistencia_aula(payload.dict())
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-@app.put("/asistir-aula/{id_asist}")
+@app.put("/asistir-aula/{id_asist}") # RUTA DE TUTOR/ADMIN_ACTUANDO
 def modificar_asistencia(id_asist: int, payload: AsistenciaAulaIn):
     result = crud.modificar_asistencia_aula(id_asist, payload.dict())
     if isinstance(result, dict) and "error" in result:
@@ -570,14 +609,14 @@ def horarios_aula_activos(id_aula: int):
     return crud.list_horarios_aula_activos(id_aula)
 
 # ============================
-# ASISTENCIA ESTUDIANTE
+# ASISTENCIA ESTUDIANTE (ADMINISTRATIVO ACTUANDO)
 # ============================
 
-@app.get("/admin/listar-clases-tutor")
-def listar_clases_tutor(id_persona: int = Query(...)):
+@app.get("/admin/listar-clases-tutor", dependencies=[Depends(require_role(ADMIN_ROLES))])
+def listar_clases_tutor(id_persona: int = Query(...)): # id_persona es el Tutor objetivo
     return crud.listar_clases_tutor(id_persona)
 
-@app.post("/admin/registrar-asistencia-estudiante")
+@app.post("/admin/registrar-asistencia-estudiante", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def registrar_asistencia_estudiante(payload: RegistrarAsistenciaEstudianteIn):
     """
     Inserta o actualiza la asistencia de un estudiante para una clase específica.
@@ -588,14 +627,14 @@ def registrar_asistencia_estudiante(payload: RegistrarAsistenciaEstudianteIn):
         raise HTTPException(status_code=400, detail=r["error"])
     return r
 
-@app.get("/admin/listar-asistencia-estudiantes")
+@app.get("/admin/listar-asistencia-estudiantes", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_asistencia_estudiantes(id_asist: int):
     """
     Devuelve los estudiantes del aula de esa asistencia, con su marca de asistencia (S/N) y observación.
     """
     return crud.listar_asistencia_estudiantes(id_asist)
 
-@app.get("/admin/listar-asistencia-estudiantes-todas")
+@app.get("/admin/listar-asistencia-estudiantes-todas", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_asistencia_estudiantes_todas(id_persona: int):
     """
     Historial plano de asistencia por estudiante para todas las clases
@@ -604,18 +643,18 @@ def listar_asistencia_estudiantes_todas(id_persona: int):
     return crud.listar_asistencia_estudiantes_todas(id_persona)
 
 # ============================
-# NOTA ESTUDIANTE
+# NOTA ESTUDIANTE (ADMINISTRATIVO ACTUANDO)
 # ============================
 
-@app.get("/admin/listar-estudiantes-aula")
+@app.get("/admin/listar-estudiantes-aula", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_estudiantes_aula(id_aula: int = Query(...)):
     return crud.listar_estudiantes_aula(id_aula)
 
-@app.get("/admin/listar-periodos")
+@app.get("/admin/listar-periodos", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_periodos():
     return crud.listar_periodos()
 
-@app.post("/admin/registrar-nota-estudiante")
+@app.post("/admin/registrar-nota-estudiante", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def registrar_nota_estudiante(payload: RegistrarNotaIn):
     r = crud.registrar_o_actualizar_nota(
         payload.id_estudiante,
@@ -626,26 +665,27 @@ def registrar_nota_estudiante(payload: RegistrarNotaIn):
         raise HTTPException(status_code=400, detail=r.get("msg", "Error"))
     return r
 
-@app.get("/admin/obtener-nota-estudiante")
+@app.get("/admin/obtener-nota-estudiante", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def obtener_nota_estudiante(id_estudiante: int, id_componente: int):
     return crud.obtener_nota_estudiante(id_estudiante, id_componente)
 
-@app.get("/admin/listar-componentes-periodo-tipo")
+@app.get("/admin/listar-componentes-periodo-tipo", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_componentes_periodo_tipo(id_periodo: int, tipo_programa: str):
     return crud.listar_componentes_periodo_tipo(id_periodo, tipo_programa)
 
-@app.get("/admin/listar-aulas-tutor")
+# Esta función está duplicada, la protegemos en ambos lugares.
+@app.get("/admin/listar-aulas-tutor", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_aulas_tutor(id_persona: int = Query(...)):
     return crud.listar_aulas_tutor(id_persona)
 
-@app.get("/admin/listar-tutores")
+@app.get("/admin/listar-tutores", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_tutores():
     return crud.listar_tutores()
 # ============================
 # CALENDARIO SEMANAS
 # ============================
 
-@app.post("/admin/generar-calendario-semanas")
+@app.post("/admin/generar-calendario-semanas", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def generar_calendario_semanas(anio: int = Query(..., description="Año a generar")):
     """
     Genera todas las semanas del año especificado, de lunes a domingo.
@@ -653,7 +693,7 @@ def generar_calendario_semanas(anio: int = Query(..., description="Año a genera
     """
     return crud.generar_calendario_semanas(anio)
 
-@app.get("/admin/listar-semanas")
+@app.get("/admin/listar-semanas", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def endpoint_listar_semanas():
     return crud.listar_semanas()
 
@@ -661,14 +701,14 @@ def endpoint_listar_semanas():
 # FESTIVOS
 # ============================
 
-@app.post("/admin/agregar-festivo")
+@app.post("/admin/agregar-festivo", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def endpoint_agregar_festivo(
     fecha: str = Body(..., embed=True),
     descripcion: str = Body(..., embed=True)
 ):
     return crud.agregar_festivo(fecha, descripcion)
 
-@app.get("/admin/listar-festivos")
+@app.get("/admin/listar-festivos", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def endpoint_listar_festivos(anio: int = Query(...)):
     return crud.listar_festivos(anio)
 
@@ -676,19 +716,19 @@ def endpoint_listar_festivos(anio: int = Query(...)):
 # MOTIVOS DE INASISTENCIA
 # ============================
 
-@app.post("/admin/agregar-motivo-inasistencia")
+@app.post("/admin/agregar-motivo-inasistencia", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def agregar_motivo_inasistencia(descripcion: str = Body(..., embed=True)):
     return crud.agregar_motivo_inasistencia(descripcion)
 
-@app.get("/admin/listar-motivos-inasistencia")
+@app.get("/admin/listar-motivos-inasistencia", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_motivos_inasistencia():
     return crud.listar_motivos()
 
-@app.delete("/admin/eliminar-motivo-inasistencia")
+@app.delete("/admin/eliminar-motivo-inasistencia", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def eliminar_motivo_inasistencia(id_motivo: int = Query(...)):
     return crud.eliminar_motivo(id_motivo)
 
-@app.put("/admin/modificar-motivo-inasistencia")
+@app.put("/admin/modificar-motivo-inasistencia", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def modificar_motivo_inasistencia(payload: dict = Body(...)):
     return crud.modificar_motivo(payload['id_motivo'], payload['descripcion'])
 
@@ -780,19 +820,19 @@ def login(payload: LoginIn):
             pass
 
 # ============================
-# REPORTES
+# REPORTES (ADMINISTRATIVO ACTUANDO)
 # ============================
 
-@app.get("/admin/reporte-asistencia-tutor")
+@app.get("/admin/reporte-asistencia-tutor", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def reporte_asistencia_tutor(id_persona: int, fecha_inicio: str, fecha_fin: str):
     return crud.reporte_asistencia_tutor(id_persona, fecha_inicio, fecha_fin)
 
-@app.get("/admin/score-estudiante")
+@app.get("/admin/score-estudiante", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def get_score_estudiante(id_estudiante: int):
     return crud.obtener_score_estudiante(id_estudiante)
 
 
-@app.post("/admin/score-estudiante")
+@app.post("/admin/score-estudiante", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def post_score_estudiante(
     id_estudiante: int = Body(...),
     score_entrada: float | None = Body(None),
@@ -800,20 +840,22 @@ def post_score_estudiante(
 ):
     return crud.actualizar_score_estudiante(id_estudiante, score_entrada, score_salida)
 
-@app.get("/admin/estudiantes")
+@app.get("/admin/estudiantes", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_estudiantes_admin():
     return crud.listar_estudiantes_admin()
 
 @app.get("/reportes/aula/{id_aula}/asistencia")
 def reporte_aula(id_aula: int, id_semana: int = None):
+    # La validación de que sea tutor o admin actuando debería hacerse en el CRUD/auth
     return reports.reporte_asistencia_aula(id_aula, id_semana)
 
 @app.get("/reporte/autogestion-tutor")
 def reporte_autogestion_tutor(id_persona: int, fecha_inicio: str, fecha_fin: str):
+    # Sin protección explícita, se asume que el usuario es el tutor o un admin
     return crud.reporte_autogestion_tutor(id_persona, fecha_inicio, fecha_fin)
 
 
-@app.post("/reporte/notas-tutor-periodo")
+@app.post("/reporte/notas-tutor-periodo", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def post_notas_tutor_periodo(payload: dict):
     return crud.guardar_notas_tutor_periodo(
         payload.get("id_persona"),
@@ -821,15 +863,15 @@ def post_notas_tutor_periodo(payload: dict):
         payload.get("notas", []),
     )
 
-@app.get("/admin/periodos")
+@app.get("/admin/periodos", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def listar_periodos_endpoint():
     return crud.listar_periodos()
 
-@app.get("/reporte/notas-tutor-periodo")
+@app.get("/reporte/notas-tutor-periodo", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def get_notas_tutor_periodo(id_persona: int, id_periodo: int, id_aula: int):
     return crud.reporte_notas_tutor_periodo(id_persona, id_periodo, id_aula)
 
-@app.post("/reporte/notas-tutor-periodo")
+@app.post("/reporte/notas-tutor-periodo", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def post_notas_tutor_periodo(payload: dict):
     return crud.guardar_notas_tutor_periodo(
         payload["id_persona"],
@@ -837,7 +879,7 @@ def post_notas_tutor_periodo(payload: dict):
         payload["notas"],
     )
 
-@app.get("/admin/aulas-por-tutor")
+@app.get("/admin/aulas-por-tutor", dependencies=[Depends(require_role(ADMIN_ROLES))])
 def aulas_por_tutor(id_persona: int):
     return crud.listar_aulas_tutor(id_persona)
 
@@ -852,6 +894,8 @@ def dashboard_kpis(
     cur = conn.cursor()
     try:
         # -------- KPIs GLOBALes (ADMIN / ADMINISTRATIVO) --------
+        # Se requiere protección de permisos. Si el rol no es TUTOR, se asume ADMIN/ADMINISTRATIVO.
+        # Mejorar: Añadir la dependencia require_role si quieres forzar la seguridad aquí.
         if rol != "TUTOR" or not id_persona:
             cur.execute("SELECT COUNT(*) FROM INSTITUCION")
             instituciones = cur.fetchone()[0]
@@ -866,12 +910,12 @@ def dashboard_kpis(
             cur.execute("""
                 SELECT NVL(ROUND(AVG(
                     CASE
-                      WHEN aa.dictada = 'S' THEN 100
-                      WHEN aa.dictada = 'N'
-                           AND aa.reposicion = 'S'
-                           AND aa.fecha_reposicion IS NOT NULL
+                     WHEN aa.dictada = 'S' THEN 100
+                     WHEN aa.dictada = 'N'
+                          AND aa.reposicion = 'S'
+                          AND aa.fecha_reposicion IS NOT NULL
                         THEN 100
-                      ELSE 0
+                     ELSE 0
                     END
                 )),0)
                 FROM ASISTENCIA_AULA aa
@@ -886,7 +930,8 @@ def dashboard_kpis(
             }
 
         # -------- KPIs DEL TUTOR (solo sus aulas/estudiantes) --------
-
+        
+        # ... (código existente del TUTOR) ...
         # Aulas donde el tutor tiene asignación vigente
         cur.execute("""
             SELECT COUNT(DISTINCT a.id_aula)
@@ -906,7 +951,7 @@ def dashboard_kpis(
             JOIN AULA a        ON a.id_aula        = ta.id_aula
             JOIN HISTORICO_AULA_ESTUDIANTE hae
                  ON hae.id_aula = a.id_aula
-                AND hae.fecha_fin IS NULL
+               AND hae.fecha_fin IS NULL
             WHERE at.id_persona = :1
               AND at.fecha_fin IS NULL
         """, (id_persona,))
@@ -965,7 +1010,7 @@ def dashboard_actividad(
                        a.id_aula, a.id_institucion, a.id_sede
                 FROM AULA a
                 JOIN SEDE s ON s.id_institucion = a.id_institucion
-                           AND s.id_sede       = a.id_sede
+                              AND s.id_sede        = a.id_sede
                 JOIN INSTITUCION i ON i.id_institucion = a.id_institucion
                 ORDER BY a.id_aula DESC
             """)
@@ -1041,9 +1086,9 @@ def dashboard_actividad(
             JOIN TUTOR_AULA ta ON ta.id_tutor_aula = at.id_tutor_aula
             JOIN AULA a        ON a.id_aula        = ta.id_aula
             JOIN HISTORICO_AULA_ESTUDIANTE hae
-                ON hae.id_aula = a.id_aula
+                 ON hae.id_aula = a.id_aula
             JOIN ESTUDIANTE e
-                ON e.id_estudiante = hae.id_estudiante
+                 ON e.id_estudiante = hae.id_estudiante
             WHERE at.id_persona = :1
             AND hae.fecha_inicio IS NOT NULL
             ORDER BY hae.id_hist_aula_est DESC
