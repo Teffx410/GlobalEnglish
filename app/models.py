@@ -1,15 +1,13 @@
 # app/models.py
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Literal
-from datetime import date, time, datetime
+from datetime import date, time
+
 
 # ============================
-# CONFIGURACIÓN (ADMINISTRADOR)
+# ROLES Y CONFIGURACIÓN
 # ============================
-
-# Modelos base para la gestión de tipos de datos estáticos por el ADMINISTRADOR.
-# Esto incluye roles, menús (no implementado aquí), y tipos de documentos.
 
 class RolBase(BaseModel):
     nombre: Literal['ADMINISTRADOR', 'ADMINISTRATIVO', 'TUTOR']
@@ -17,6 +15,7 @@ class RolBase(BaseModel):
 
 class RolOut(RolBase):
     id_rol: int
+
 
 class TipoDocumentoBase(BaseModel):
     nombre_tipo: str
@@ -27,7 +26,6 @@ class TipoDocumentoOut(TipoDocumentoBase):
 
 
 class SemanaBase(BaseModel):
-    """Modelo para el calendario de semanas del programa, creado 1 sola vez por el ADMINISTRADOR."""
     nombre_semana: str
     fecha_inicio: date
     fecha_fin: date
@@ -41,12 +39,11 @@ class SemanaOut(SemanaBase):
 
 
 # ============================
-# INSTITUCION
+# INSTITUCIÓN / SEDE
 # ============================
 
 class InstitucionCreate(BaseModel):
     nombre_inst: str
-    # Jornadas limitadas a 3 opciones
     jornada: Optional[Literal['MAÑANA', 'TARDE', 'MIXTA']] = 'MIXTA'
     dir_principal: Optional[str] = None
 
@@ -54,68 +51,56 @@ class InstitucionOut(InstitucionCreate):
     id_institucion: int
 
 
-# ============================
-# SEDE
-# ============================
-
 class SedeCreate(BaseModel):
     id_institucion: int
     direccion: str
-    # 'S' (Principal) o 'N' (No Principal)
     es_principal: Literal['S', 'N'] = 'N'
-
-class SedeUpdate(BaseModel):
-    direccion: Optional[str] = None
-    es_principal: Optional[Literal['S', 'N']] = None
 
 class SedeOut(SedeCreate):
     id_sede: int
 
 
 # ============================
-# PERSONA / USUARIO
+# PERSONA Y USUARIO
 # ============================
 
-# Nota: El rol se gestionará al crear el USUARIO. En la Persona solo definimos su información.
 class PersonaCreate(BaseModel):
     id_tipo_doc: int
     num_documento: str
     nombre: str
     telefono: Optional[str] = None
     correo: Optional[str] = None
-
-class PersonaUpdate(BaseModel):
-    id_tipo_doc: Optional[int] = None
-    num_documento: Optional[str] = None
-    nombre: Optional[str] = None
-    telefono: Optional[str] = None
-    correo: Optional[str] = None
+    contratado: Literal['S', 'N'] = "S"
+    perfil_tecnico: Optional[Literal['S', 'N']] = "N"  # Para ADMINISTRADOR
 
 class PersonaOut(PersonaCreate):
     id_persona: int
 
 
-class UsuarioCreate(BaseModel):
-    """Modelo para la creación de un Usuario asociado a una Persona y un Rol."""
-    id_persona: int
-    id_rol: int # ID del rol (TUTOR, ADMINISTRATIVO, ADMINISTRADOR)
-    nombre_user: str
-    # La contraseña se envía en texto plano para ser hasheada
-    contrasena: str 
-    # El ADMINISTRADOR puede enviar la contraseña por correo
-    enviar_correo: bool = True 
+class PersonaUpdate(BaseModel):
+    nombre: Optional[str] = None
+    telefono: Optional[str] = None
+    correo: Optional[str] = None
+    perfil_tecnico: Optional[Literal['S', 'N']] = None
 
-class UsuarioLogin(BaseModel):
-    """Modelo para la solicitud de login."""
+
+class UsuarioCreate(BaseModel):
+    id_persona: int
+    id_rol: int
     nombre_user: str
     contrasena: str
-    
+    enviar_correo: bool = True
+
+class UsuarioLogin(BaseModel):
+    nombre_user: str
+    contrasena: str
+
 class UsuarioOut(BaseModel):
-    """Modelo de salida simplificado para el usuario."""
     id_usuario: int
     nombre_user: str
     id_persona: int
     rol: Literal['ADMINISTRADOR', 'ADMINISTRATIVO', 'TUTOR']
+
 
 # ============================
 # AULA
@@ -124,7 +109,7 @@ class UsuarioOut(BaseModel):
 class AulaCreate(BaseModel):
     id_institucion: int
     id_sede: int
-    grado: str 
+    grado: str
 
 class AulaOut(AulaCreate):
     id_aula: int
@@ -135,17 +120,17 @@ class AulaOut(AulaCreate):
 # ============================
 
 class HorarioCreate(BaseModel):
-    # Días de la semana restringidos
-    dia_semana: Literal['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-    # Usar el tipo time para validar formato HH:MM
+    dia_semana: Literal[
+        'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
+    ]
     h_inicio: time
     h_final: time
-    minutos_equiv: int = 45 # Usando 45 minutos como hora equivalente
-    # 'S' o 'N'
+    minutos_equiv: int = 45
     es_continuo: Literal['S', 'N'] = "S"
 
 class HorarioOut(HorarioCreate):
     id_horario: int
+
 
 class AsignarHorarioAula(BaseModel):
     id_aula: int
@@ -154,16 +139,18 @@ class AsignarHorarioAula(BaseModel):
 
 
 # ============================
-# ASIGNACIÓN DE TUTOR A AULA
-# (Esto define qué Aulas tiene asignadas un TUTOR/ADMINISTRATIVO)
+# TUTOR – AULA
 # ============================
 
 class TutorAulaAssign(BaseModel):
-    """Asignar una Persona (con rol Tutor o Administrativo) a un Aula."""
     id_aula: int
-    id_persona: int # ID de la persona (Tutor)
+    id_persona: int
     fecha_inicio: date
     motivo_cambio: Optional[str] = None
+
+class TutorAulaOut(TutorAulaAssign):
+    id_tutor_aula: int
+
 
 class TutorAulaUnassign(BaseModel):
     id_aula: int
@@ -171,56 +158,53 @@ class TutorAulaUnassign(BaseModel):
 
 
 # ============================
-# ESTUDIANTES / HISTORICO
+# ESTUDIANTES / HISTÓRICO
 # ============================
 
 class EstudianteIn(BaseModel):
     id_tipo_doc: int
     num_documento: str
     nombres: str
-    apellidos: Optional[str]
-    telefono: Optional[str]
-    fecha_nacimiento: Optional[date]
-    correo: Optional[str]
-    score_entrada: Optional[float] = None
-    score_salida: Optional[float] = None
-
-class EstudianteUpdate(BaseModel):
-    # Permitir al Administrativo actualizar solo scores
-    score_entrada: Optional[float] = None
-    score_salida: Optional[float] = None
-    # Permitir otros campos
-    nombres: Optional[str] = None
     apellidos: Optional[str] = None
-    # ... otros campos de la persona
+    telefono: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    correo: Optional[str] = None
+    score_entrada: Optional[float] = None
+    score_salida: Optional[float] = None
 
 class EstudianteOut(EstudianteIn):
     id_estudiante: int
 
+
+class EstudianteUpdate(BaseModel):
+    nombres: Optional[str] = None
+    apellidos: Optional[str] = None
+    score_entrada: Optional[float] = None
+    score_salida: Optional[float] = None
+
+
 class HistoricoAulaEstudianteIn(BaseModel):
-    """Modelo para ingresar estudiantes a un aula."""
     id_estudiante: int
     id_aula: int
     fecha_inicio: Optional[date] = None
 
+
 class CambioEstudianteAulaIn(BaseModel):
-    """Modelo para MOVER estudiantes de un aula a otra (cierra histórico anterior y abre uno nuevo)."""
     id_estudiante: int
     id_aula_origen: int
     id_aula_destino: int
-    fecha_fin_origen: date # Fecha de fin en el aula original
-    fecha_inicio_destino: date # Fecha de inicio en la nueva aula
+    fecha_fin_origen: date
+    fecha_inicio_destino: date
 
 
 # ============================
-# ASISTENCIA, NOTAS Y REPOSICIÓN
+# ASISTENCIA AULA Y ESTUDIANTES
 # ============================
 
 class AsistenciaAulaBase(BaseModel):
-    """Modelo base para registrar la clase dictada por el Tutor."""
     id_aula: int
-    # ID de la asignación Tutor-Aula (para saber quién dictó la clase)
-    id_tutor_aula: int 
+    id_tutor_aula: int          # tutor real asignado al aula
+    id_tutor_que_registra: int  # tutor o administrativo que registra la asistencia
     id_horario: int
     id_semana: int
     fecha_clase: date
@@ -229,30 +213,23 @@ class AsistenciaAulaBase(BaseModel):
     dictada: Literal['S', 'N']
     horas_dictadas: int
     reposicion: Literal['S', 'N'] = "N"
-    fecha_reposicion: Optional[date] = None # Campo para el requisito de reposición
-    id_motivo: Optional[int] = None # Motivo de no asistencia a clase
-    corresponde_horario: int
-    es_festivo: int # 1 si es festivo, 0 si no
+    fecha_reposicion: Optional[date] = None
+    id_motivo: Optional[int] = None
+    corresponde_horario: Literal['S', 'N']
+    es_festivo: Literal['S', 'N']
 
 class AsistenciaAulaOut(AsistenciaAulaBase):
     id_asist: int
 
 
-class RegistrarNotaIn(BaseModel):
-    id_estudiante: int
-    id_componente: int
-    nota: float
-
-
 class RegistrarAsistenciaEstudianteIn(BaseModel):
-    id_asist: int # La clase dictada que se tomó como referencia
+    id_asist: int
     id_estudiante: int
     asistio: Literal['S', 'N']
     observacion: Optional[str] = None
 
 
 class RegistrarAsistenciaTutor(BaseModel):
-    """Modelo para que el ADMINISTRATIVO verifique la asistencia del Tutor."""
     id_tutor: int
     fecha: date
     asistio: Literal['S', 'N']
@@ -260,21 +237,13 @@ class RegistrarAsistenciaTutor(BaseModel):
 
 
 # ============================
-# MOTIVO Y FESTIVOS
+# NOTAS / PERIODO / COMPONENTES
 # ============================
 
-class MotivoNoAsistenciaIn(BaseModel):
-    nombre: str
-    descripcion: Optional[str] = None
-
-class FestivoIn(BaseModel):
-    nombre: str
-    fecha: date
-    recurrente: bool = False # Es un festivo que se repite cada año
-
-# ============================
-# PERIODO / COMPONENTE DE NOTAS
-# ============================
+class RegistrarNotaIn(BaseModel):
+    id_estudiante: int
+    id_componente: int
+    nota: float = Field(ge=0, le=5)
 
 class PeriodoIn(BaseModel):
     nombre: str
@@ -284,18 +253,32 @@ class PeriodoIn(BaseModel):
 class ComponenteIn(BaseModel):
     nombre: str
     porcentaje: float
-    # El programa se refiere al tipo de programa (e.g., Nivelación, Taller)
-    tipo_programa: str 
+    tipo_programa: str
     id_periodo: int
 
+
 # ============================
-# SOLICITUD DE ACCIÓN DELEGADA
+# MOTIVOS / FESTIVOS
+# ============================
+
+class MotivoNoAsistenciaIn(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+
+
+class FestivoIn(BaseModel):
+    nombre: str
+    fecha: date
+    recurrente: bool = False
+
+
+# ============================
+# ACCIÓN DELEGADA
 # ============================
 
 class DelegatedActionRequest(BaseModel):
     """
-    Modelo especial para el ADMINISTRATIVO que solicita actuar sobre un Tutor.
-    Se usará como parámetro de consulta o en el cuerpo de la solicitud
-    en las rutas de TUTOR (Asistencia/Notas/Reportes).
+    Modelo que debe enviar el ADMINISTRATIVO para actuar
+    sobre acciones del tutor.
     """
-    id_tutor_a_actuar: int # El ID de la persona (TUTOR) sobre la que se actuará
+    id_tutor_a_actuar: int
