@@ -42,7 +42,7 @@ function Usuarios() {
       <h2>Registrar Usuario (Persona existente)</h2>
       <form className="instituciones-form" onSubmit={agregarUsuario}>
         <input className="aulas-form-input" type="text" name="nombre_user" placeholder="Nombre usuario" value={form.nombre_user} onChange={handleFormChange} required/>
-        <input className="aulas-form-input" type="password" name="contrasena" placeholder="Contraseña (opcional)" value={form.contrasena} onChange={handleFormChange}/>
+        <input className="aulas-form-input" type="password" name="contrasena" placeholder="Contraseña" value={form.contrasena} onChange={handleFormChange}/>
         <select className="aulas-form-input" name="id_persona" value={form.id_persona} onChange={handleFormChange} required>
           <option value="">Persona</option>
           {personas.map(p =>

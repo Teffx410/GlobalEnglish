@@ -81,17 +81,17 @@ function App() {
             />
             {/* Reporte de asistencia del aula */}
             <Route
-              //path="reporte-asistencia-aula"
+              path="reporte-asistencia-aula"
               element={<ReporteAsistenciaAula />}
             />
             {/* NUEVO: reporte de asistencia del estudiante */}
             <Route
-              //path="reporte-asistencia-estudiante"
+              path="reporte-asistencia-estudiante"
               element={<ReporteAsistenciaEstudiante />}
             />
             {/* NUEVO: boletín de calificaciones del estudiante */}
             <Route
-              //path="boletin-estudiante"
+              path="boletin-estudiante"
               element={<BoletinEstudiante />}
             />
           </>

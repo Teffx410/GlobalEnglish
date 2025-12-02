@@ -102,11 +102,18 @@ function AsignarHorarioAula() {
     if (!finIdHist) return;
     setMsg("");
     try {
-      const body = finFecha ? { fecha_fin: finFecha } : {};
+      // fecha_fin se envía como query param, NO en el body
+      const params = {};
+      if (finFecha) {
+        params.fecha_fin = finFecha; // YYYY-MM-DD
+      }
+
       const r = await axios.put(
         `${BASE}/historial-horarios-aula/${finIdHist}/fin`,
-        body
+        null,
+        { params }
       );
+
       setMsg(r.data.msg || "Horario marcado como finalizado.");
       setShowModal(false);
       setFinIdHist(null);
@@ -279,7 +286,9 @@ function AsignarHorarioAula() {
               onChange={(e) => setFinFecha(e.target.value)}
               style={{ marginBottom: 12 }}
             />
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <div
+              style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}
+            >
               <button
                 type="button"
                 className="aulas-btn aulas-btn-secundario"

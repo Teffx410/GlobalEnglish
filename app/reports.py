@@ -55,11 +55,11 @@ def reporte_asistencia_aula(id_aula, id_semana=None):
         cur.close()
         conn.close()
 
-
 def reporte_asistencia_aula_rango(id_aula: int, fecha_inicio: str, fecha_fin: str):
     """
     Reporte de asistencia del aula en un rango de fechas.
-    Usa: INSTITUCION, AULA, ASISTENCIA_AULA, SEMANA, ASIGNACION_TUTOR, PERSONA.
+    Usa: INSTITUCION, AULA, ASISTENCIA_AULA, SEMANA, HORARIO,
+         ASIGNACION_TUTOR, PERSONA, MOTIVO_INASISTENCIA.
     """
     conn = get_conn()
     cur = conn.cursor()
@@ -69,10 +69,10 @@ def reporte_asistencia_aula_rango(id_aula: int, fecha_inicio: str, fecha_fin: st
 
         sql = """
         SELECT
-            i.nombre_inst                       AS nombre_inst,
+            i.nombre_inst                          AS nombre_inst,
             a.id_aula,
-            a.grado                             AS grado,
-            s.numero_semana                     AS numero_semana,
+            a.grado                                AS grado,
+            s.numero_semana                        AS numero_semana,
             aa.id_asist,
             aa.fecha_clase,
             aa.hora_inicio,
@@ -82,11 +82,18 @@ def reporte_asistencia_aula_rango(id_aula: int, fecha_inicio: str, fecha_fin: st
             h.h_final,
             aa.dictada,
             aa.horas_dictadas,
-            m.descripcion                        AS motivo,
+            CASE
+              -- Clase NO dictada y SIN reposición => horas_no_dictadas
+              WHEN aa.dictada = 'N'
+                   AND (aa.reposicion IS NULL OR aa.reposicion = 'N')
+              THEN (NVL(h.minutos_equiv, 0) / 60) - NVL(aa.horas_dictadas, 0)
+              ELSE 0
+            END                                    AS horas_no_dictadas,
+            m.descripcion                          AS motivo,
             aa.reposicion,
             aa.fecha_reposicion,
-            t.id_persona                         AS id_tutor_persona,
-            p.nombre                             AS tutor,
+            t.id_persona                           AS id_tutor_persona,
+            p.nombre                               AS tutor,
             aa.id_motivo
         FROM ASISTENCIA_AULA aa
         JOIN AULA a
@@ -115,7 +122,6 @@ def reporte_asistencia_aula_rango(id_aula: int, fecha_inicio: str, fecha_fin: st
         for row in cur.fetchall():
             d = dict(zip(cols, row))
 
-            # fechas a ISO string si quieres
             fc = d.get("fecha_clase")
             fr = d.get("fecha_reposicion")
             if fc:
@@ -136,7 +142,8 @@ def reporte_asistencia_aula_rango(id_aula: int, fecha_inicio: str, fecha_fin: st
                 "h_inicio": d.get("h_inicio"),
                 "h_final": d.get("h_final"),
                 "dictada": d.get("dictada"),
-                "horas_dictadas": d.get("horas_dictadas"),
+                "horas_dictadas": float(d.get("horas_dictadas") or 0),
+                "horas_no_dictadas": float(d.get("horas_no_dictadas") or 0),
                 "motivo": d.get("motivo"),
                 "reposicion": d.get("reposicion"),
                 "fecha_reposicion": d.get("fecha_reposicion"),
@@ -233,21 +240,15 @@ def reporte_asistencia_estudiante_rango(id_estudiante: int, fecha_inicio: str, f
     finally:
         cur.close()
         conn.close()
-
 def boletin_estudiante_periodo(id_estudiante: int, id_periodo: int):
-    """
-    Boletín de calificaciones de un estudiante en un periodo:
-    institución, grado, programa, periodo, componentes, nota y definitiva.
-    """
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # Datos básicos: institución, grado y programa (INSIDE/OUTSIDE)
+        # 1) Datos básicos: institución y grado del aula vigente en el periodo
         sql_info = """
         SELECT
             i.nombre_inst,
             a.grado,
-            c.tipo_programa,
             p.nombre AS nombre_periodo
         FROM HISTORICO_AULA_ESTUDIANTE hae
         JOIN AULA a
@@ -257,10 +258,8 @@ def boletin_estudiante_periodo(id_estudiante: int, id_periodo: int):
          AND s.id_sede = a.id_sede
         JOIN INSTITUCION i
           ON i.id_institucion = s.id_institucion
-        JOIN COMPONENTE c
-          ON c.id_periodo = :idp
         JOIN PERIODO p
-          ON p.id_periodo = c.id_periodo
+          ON p.id_periodo = :idp
         WHERE hae.id_estudiante = :ide
           AND (hae.fecha_fin IS NULL OR hae.fecha_fin >= p.fecha_inicio)
           AND hae.fecha_inicio <= p.fecha_fin
@@ -280,9 +279,12 @@ def boletin_estudiante_periodo(id_estudiante: int, id_periodo: int):
                 "definitiva": None,
             }
 
-        nombre_inst, grado, tipo_programa, nombre_periodo = info
+        nombre_inst, grado, nombre_periodo = info
 
-        # Componentes del periodo y sus notas para el estudiante
+        # 2) Determinar programa según el grado (4-5 / 9-10)
+        tipo_programa = resolver_tipo_programa_por_grado(str(grado))
+
+        # 3) Componentes solo de ese tipo de programa
         sql_comp = """
         SELECT
             c.id_componente,
@@ -295,9 +297,14 @@ def boletin_estudiante_periodo(id_estudiante: int, id_periodo: int):
           ON n.id_componente = c.id_componente
          AND n.id_estudiante = :ide
         WHERE c.id_periodo = :idp
+          AND c.tipo_programa = :tp
         ORDER BY c.id_componente
         """
-        cur.execute(sql_comp, {"idp": id_periodo, "ide": id_estudiante})
+        cur.execute(
+            sql_comp,
+            {"idp": id_periodo, "ide": id_estudiante, "tp": tipo_programa},
+        )
+
         componentes = []
         suma_ponderada = 0.0
         for idc, nombre, porc, tipoprog, nota in cur.fetchall():
@@ -330,3 +337,19 @@ def boletin_estudiante_periodo(id_estudiante: int, id_periodo: int):
     finally:
         cur.close()
         conn.close()
+
+def resolver_tipo_programa_por_grado(grado: str) -> str:
+    if not grado:
+        return ""
+    g = grado.strip()
+    try:
+        n = int(g)
+    except ValueError:
+        n = None
+
+    if n in (4, 5):
+        return "INSIDECLASSROOM"
+    if n in (9, 10):
+        return "OUTSIDECLASSROOM"
+    # por defecto
+    return "INSIDECLASSROOM"

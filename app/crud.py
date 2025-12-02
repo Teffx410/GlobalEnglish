@@ -1000,6 +1000,41 @@ def aula_tiene_tutor_activo_en_fecha(id_aula: int, fecha: str) -> bool:
         cur.close()
         conn.close()
 
+def aula_tiene_otro_tutor_activo_en_fecha(
+    id_aula: int,
+    fecha: str,
+    id_tutor_aula_excluir: int
+) -> bool:
+    """
+    ¿Hay alguna asignación ACTIVA en ese aula, en la fecha dada,
+    DISTINTA de id_tutor_aula_excluir?
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM TUTOR_AULA ta
+            JOIN ASIGNACION_TUTOR at ON ta.id_tutor_aula = at.id_tutor_aula
+            WHERE ta.id_aula = :id_aula
+              AND at.id_tutor_aula <> :id_excluir
+              AND at.fecha_inicio <= TO_DATE(:fecha, 'YYYY-MM-DD')
+              AND (at.fecha_fin IS NULL OR at.fecha_fin >= TO_DATE(:fecha, 'YYYY-MM-DD'))
+            """,
+            {
+                "id_aula": id_aula,
+                "id_excluir": id_tutor_aula_excluir,
+                "fecha": fecha[:10],
+            },
+        )
+        (count,) = cur.fetchone()
+        return count > 0
+    finally:
+        cur.close()
+        conn.close()
+
+
 def aula_tiene_tutor_activo(id_aula: int) -> bool:
     """
     ¿Hay alguna asignación en ese aula con fecha_fin NULL?
@@ -1156,10 +1191,14 @@ def cambiar_tutor_aula(data: dict):
     id_tutor_aula_actual = int(data["id_tutor_aula_actual"])
     fecha_fin_actual = data.get("fecha_fin_actual")
 
-    # El aula no puede quedar con dos tutores en la misma fecha de inicio
-    if aula_tiene_tutor_activo_en_fecha(id_aula, fecha_inicio_nuevo):
+    # El aula no puede quedar con DOS tutores distintos activos en la misma fecha
+    if aula_tiene_otro_tutor_activo_en_fecha(
+        id_aula,
+        fecha_inicio_nuevo,
+        id_tutor_aula_actual,
+    ):
         return {
-            "error": "El aula ya tiene un tutor asignado en esa fecha. Ajuste la fecha de fin del tutor actual."
+            "error": "El aula ya tiene otro tutor asignado en esa fecha. Ajuste la fecha de fin del tutor actual."
         }
 
     # Validar cruce de horarios para el nuevo tutor
@@ -1173,35 +1212,47 @@ def cambiar_tutor_aula(data: dict):
     try:
         # 1) cerrar asignación actual
         if fecha_fin_actual:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE ASIGNACION_TUTOR
                 SET fecha_fin = TO_DATE(:1, 'YYYY-MM-DD'),
                     motivo_cambio = :2
                 WHERE id_tutor_aula = :3
                   AND fecha_fin IS NULL
-            """, (fecha_fin_actual, motivo, id_tutor_aula_actual))
+                """,
+                (fecha_fin_actual[:10], motivo, id_tutor_aula_actual),
+            )
         else:
-            cur.execute("""
+            cur.execute(
+                """
                 UPDATE ASIGNACION_TUTOR
                 SET fecha_fin = SYSDATE,
                     motivo_cambio = :1
                 WHERE id_tutor_aula = :2
                   AND fecha_fin IS NULL
-            """, (motivo, id_tutor_aula_actual))
+                """,
+                (motivo, id_tutor_aula_actual),
+            )
 
         # 2) nueva asignación
         new_id = cur.var(oracledb.NUMBER)
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, motivo_cambio)
             VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), NULL)
             RETURNING id_tutor_aula INTO :3
-        """, (id_persona_nuevo, fecha_inicio_nuevo, new_id))
+            """,
+            (id_persona_nuevo, fecha_inicio_nuevo, new_id),
+        )
         id_tutor_aula_nuevo = int(new_id.getvalue()[0])
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO TUTOR_AULA (id_tutor_aula, id_aula)
             VALUES (:1, :2)
-        """, (id_tutor_aula_nuevo, id_aula))
+            """,
+            (id_tutor_aula_nuevo, id_aula),
+        )
 
         conn.commit()
         return {
@@ -1211,6 +1262,7 @@ def cambiar_tutor_aula(data: dict):
     finally:
         cur.close()
         conn.close()
+
 
 def finalizar_asignacion_tutor(
     id_tutor_aula: int,
@@ -2135,34 +2187,68 @@ def es_festivo(fecha_clase):
 def registrar_asistencia_aula(data):
     conn = get_conn()
     cur = conn.cursor()
+
     # Validaciones previas
-    obligatorios = ["id_aula", "id_tutor_aula", "id_horario", "id_semana", "fecha_clase", "hora_inicio", "dictada", "horas_dictadas", "corresponde_horario", "es_festivo"]
+    obligatorios = [
+        "id_aula", "id_tutor_aula", "id_horario", "id_semana",
+        "fecha_clase", "hora_inicio", "dictada",
+        "horas_dictadas", "corresponde_horario", "es_festivo"
+    ]
     for key in obligatorios:
         if data.get(key) in (None, ""):
             cur.close()
             conn.close()
             return {"error": f"Falta el campo obligatorio: {key}"}
-    if data['dictada'] == "N" and not data.get('id_motivo'):
+
+    if data["dictada"] == "N" and not data.get("id_motivo"):
         cur.close()
         conn.close()
         return {"error": "Debe registrar el motivo de inasistencia"}
-    if data.get('reposicion') == "S" and not data.get('fecha_reposicion'):
+
+    if data.get("reposicion") == "S" and not data.get("fecha_reposicion"):
         cur.close()
         conn.close()
         return {"error": "Indique la fecha de reposición"}
 
-    # Insert
-    cur.execute("""
+    # Normalizar reposición
+    reposicion = data.get("reposicion") or "N"
+    fecha_reposicion = data.get("fecha_reposicion")
+
+    # Regla: si NO se dictó y NO hay reposición -> horas_dictadas = 0
+    # (las horas no dictadas se calculan en el reporte con minutos_equiv/60)
+    if data["dictada"] == "N" and reposicion == "N":
+        data["horas_dictadas"] = 0
+
+    cur.execute(
+        """
         INSERT INTO ASISTENCIA_AULA (
             id_aula, id_tutor_aula, id_horario, id_semana, fecha_clase,
             hora_inicio, hora_fin, dictada, horas_dictadas, reposicion,
-            fecha_reposicion, id_motivo, corresponde_horario, es_festivo)
-        VALUES (:1, :2, :3, :4, TO_DATE(:5, 'YYYY-MM-DD'), :6, :7, :8, :9, :10, TO_DATE(:11, 'YYYY-MM-DD'), :12, :13, :14)
-    """, (
-        data['id_aula'], data['id_tutor_aula'], data['id_horario'], data['id_semana'], data['fecha_clase'],
-        data['hora_inicio'], data.get('hora_fin'), data['dictada'], data['horas_dictadas'], data.get('reposicion','N'),
-        data.get('fecha_reposicion'), data.get('id_motivo'), data['corresponde_horario'], data['es_festivo']
-    ))
+            fecha_reposicion, id_motivo, corresponde_horario, es_festivo
+        )
+        VALUES (
+            :1, :2, :3, :4, TO_DATE(:5, 'YYYY-MM-DD'),
+            :6, :7, :8, :9, :10,
+            TO_DATE(:11, 'YYYY-MM-DD'), :12, :13, :14
+        )
+        """,
+        (
+            data["id_aula"],
+            data["id_tutor_aula"],
+            data["id_horario"],
+            data["id_semana"],
+            data["fecha_clase"],
+            data["hora_inicio"],
+            data.get("hora_fin"),
+            data["dictada"],
+            data["horas_dictadas"],
+            reposicion,
+            fecha_reposicion,
+            data.get("id_motivo"),
+            data["corresponde_horario"],
+            data["es_festivo"],
+        ),
+    )
     conn.commit()
     cur.close()
     conn.close()
@@ -2250,21 +2336,35 @@ def modificar_asistencia_aula(id_asist, data):
 # ============================
 def listar_clases_tutor(id_persona: int):
     """
-    Usa ASISTENCIA_AULA + ASIGNACION_TUTOR para obtener las clases donde ese tutor pasó asistencia.
+    Clases del tutor que cuentan para asistencia de estudiantes:
+    - dictada = 'S', o
+    - dictada = 'N' y reposicion = 'S' con fecha_reposicion no nula.
     """
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("""
-            SELECT aa.id_asist,
-                   aa.fecha_clase,
-                   aa.id_aula
+        cur.execute(
+            """
+            SELECT
+                aa.id_asist,
+                aa.fecha_clase,
+                aa.id_aula
             FROM ASISTENCIA_AULA aa
             JOIN ASIGNACION_TUTOR at
               ON aa.id_tutor_aula = at.id_tutor_aula
             WHERE at.id_persona = :1
+              AND (
+                    aa.dictada = 'S'
+                 OR (
+                        aa.dictada = 'N'
+                    AND aa.reposicion = 'S'
+                    AND aa.fecha_reposicion IS NOT NULL
+                    )
+                  )
             ORDER BY aa.fecha_clase DESC, aa.id_asist DESC
-        """, [id_persona])
+            """,
+            [id_persona],
+        )
         rows = cur.fetchall()
         return [
             {
@@ -2277,6 +2377,7 @@ def listar_clases_tutor(id_persona: int):
     finally:
         cur.close()
         conn.close()
+
 
 def registrar_asistencia_estudiante(data: dict):
     """
