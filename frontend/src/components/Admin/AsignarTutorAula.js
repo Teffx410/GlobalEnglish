@@ -12,6 +12,7 @@ function AsignarTutorAula() {
     id_aula: "",
     id_persona: "",
     fecha_inicio: "",
+    fecha_fin: "",      // NUEVO: fin opcional al crear
   });
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -92,7 +93,8 @@ function AsignarTutorAula() {
       id_aula: parseInt(form.id_aula, 10),
       id_persona: parseInt(form.id_persona, 10),
       fecha_inicio: form.fecha_inicio,
-      motivo_cambio: null, // el backend lo ignora para alta normal
+      fecha_fin: form.fecha_fin || null,  // NUEVO: opcional
+      motivo_cambio: null,
     };
 
     axios
@@ -104,6 +106,7 @@ function AsignarTutorAula() {
           ...f,
           id_persona: "",
           fecha_inicio: "",
+          fecha_fin: "",
         }));
       })
       .catch(err => {
@@ -218,7 +221,7 @@ function AsignarTutorAula() {
         id_aula: parseInt(form.id_aula, 10),
         id_persona: parseInt(modalData.id_persona_nuevo, 10),
         fecha_inicio: modalData.fecha_inicio_nuevo,
-        motivo_cambio: modalData.motivo_cambio, // se aplica al tutor saliente
+        motivo_cambio: modalData.motivo_cambio,
         id_tutor_aula_actual: modalData.id_tutor_aula_actual,
         fecha_fin_actual: modalData.fecha_fin_actual || null,
       };
@@ -288,6 +291,17 @@ function AsignarTutorAula() {
           onChange={handleFormChange}
           required
           disabled={loading}
+        />
+
+        {/* NUEVO: fecha fin opcional al crear */}
+        <input
+          className="aulas-form-input"
+          type="date"
+          name="fecha_fin"
+          value={form.fecha_fin}
+          onChange={handleFormChange}
+          disabled={loading}
+          placeholder="Fecha fin (opcional)"
         />
 
         <button

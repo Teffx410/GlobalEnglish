@@ -1,6 +1,6 @@
 # app/main.py
 from fastapi import FastAPI, HTTPException, Depends, Query, Body
-from app.models import InstitucionIn, InstitucionOut, PersonaIn,  UsuarioIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut, SedeIn, SedeOut, HistoricoAulaEstudianteIn, CambioEstudianteAulaIn, HorarioIn, HorarioOut, AsignarHorarioAulaIn, CambiarTutorAulaIn, AsignarTutorAulaIn, PeriodoIn, ComponenteIn, AsistenciaAulaIn, RegistrarNotaIn, RegistrarAsistenciaEstudianteIn
+from app.models import InstitucionIn, InstitucionOut, PersonaIn,  UsuarioIn, PersonaOut, AulaIn, AulaOut, EstudianteIn, EstudianteOut, SedeIn, SedeOut, HistoricoAulaEstudianteIn, CambioEstudianteAulaIn, HorarioIn, HorarioOut, AsignarHorarioAulaIn, CambiarTutorAulaIn, AsignarTutorAulaIn, PeriodoIn, ComponenteIn, AsistenciaAulaIn, RegistrarNotaIn, RegistrarAsistenciaEstudianteIn, ReporteAsistenciaAulaItem, ReporteAsistenciaAulaResponse
 import app.crud as crud
 import app.reports as reports
 from app.auth import create_token, require_role
@@ -169,6 +169,9 @@ def update_sede(id_sede: int, payload: SedeIn):
 
 @app.post("/personas", response_model=PersonaOut)
 def create_persona(payload: PersonaIn):
+    """
+    Contratar Personas: El rol ADMINISTRATIVO/ADMINISTRADOR puede crear personas.
+    """
     result = crud.create_persona(payload.dict())
     
     # Verificar si hubo error
@@ -1060,3 +1063,24 @@ def dashboard_actividad(
     finally:
         cur.close()
         conn.close()
+
+@app.get("/reportes/aula/{id_aula}/asistencia-rango")
+def reporte_aula_rango(
+    id_aula: int,
+    fecha_inicio: str,
+    fecha_fin: str,
+):
+    return reports.reporte_asistencia_aula_rango(id_aula, fecha_inicio, fecha_fin)
+
+@app.get("/reportes/estudiante/{id_estudiante}/asistencia-rango")
+def reporte_estudiante_rango(
+    id_estudiante: int,
+    fecha_inicio: str,
+    fecha_fin: str,
+):
+    return reports.reporte_asistencia_estudiante_rango(id_estudiante, fecha_inicio, fecha_fin)
+
+@app.get("/reportes/estudiante/{id_estudiante}/boletin/{id_periodo}")
+def boletin_estudiante(id_estudiante: int, id_periodo: int):
+    from app import reports
+    return reports.boletin_estudiante_periodo(id_estudiante, id_periodo)

@@ -16,6 +16,8 @@ function AsignarAula() {
     id_institucion: "",
     id_sede: "",
     id_aula: "",
+    fecha_inicio: "",
+    fecha_fin: "",       // NUEVO
   });
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,6 +30,7 @@ function AsignarAula() {
     fecha_fin_actual: "",
     id_aula_destino: "",
     fecha_inicio_nueva: "",
+    fecha_fin_nueva: "",   // NUEVO
   });
 
   useEffect(() => {
@@ -101,8 +104,8 @@ function AsignarAula() {
   async function asignar(e) {
     e.preventDefault();
     setMsg("");
-    if (!form.id_estudiante || !form.id_aula) {
-      setMsg("Selecciona un estudiante y un aula");
+    if (!form.id_estudiante || !form.id_aula || !form.fecha_inicio) {
+      setMsg("Selecciona estudiante, aula y fecha de inicio.");
       return;
     }
     try {
@@ -110,13 +113,22 @@ function AsignarAula() {
       await axios.post(`${BASE}/asignar-estudiante-aula`, {
         id_estudiante: Number(form.id_estudiante),
         id_aula: Number(form.id_aula),
+        fecha_inicio: form.fecha_inicio,
+        fecha_fin: form.fecha_fin || null,
       });
       setMsg("Estudiante asignado correctamente");
       cargarEstudiantesAula(form.id_aula);
-      setForm(f => ({ ...f, id_estudiante: "" }));
+      setForm(f => ({
+        ...f,
+        id_estudiante: "",
+        fecha_inicio: "",
+        fecha_fin: "",
+      }));
     } catch (err) {
       if (err.response?.data?.detail) {
         setMsg("Error: " + err.response.data.detail);
+      } else if (err.response?.data?.error) {
+        setMsg("Error: " + err.response.data.error);
       } else {
         setMsg("Error al asignar estudiante");
       }
@@ -134,6 +146,7 @@ function AsignarAula() {
       fecha_fin_actual: "",
       id_aula_destino: "",
       fecha_inicio_nueva: "",
+      fecha_fin_nueva: "",
     });
     setModalOpen(true);
   }
@@ -149,6 +162,7 @@ function AsignarAula() {
       fecha_fin_actual: "",
       id_aula_destino: "",
       fecha_inicio_nueva: "",
+      fecha_fin_nueva: "",
     });
     setModalOpen(true);
   }
@@ -161,6 +175,7 @@ function AsignarAula() {
       fecha_fin_actual: "",
       id_aula_destino: "",
       fecha_inicio_nueva: "",
+      fecha_fin_nueva: "",
     });
   }
 
@@ -208,9 +223,10 @@ function AsignarAula() {
           id_estudiante: filaSeleccionada.id_estudiante,
           fecha_fin_actual: modalData.fecha_fin_actual || null,
           fecha_inicio_nueva: modalData.fecha_inicio_nueva,
+          fecha_fin_nueva: modalData.fecha_fin_nueva || null,
         });
         setMsg("Estudiante movido de aula correctamente.");
-        cargarEstudiantesAula(form.id_aula); // recarga aula origen
+        cargarEstudiantesAula(form.id_aula);
         cerrarModal();
       } catch (err) {
         setMsg(
@@ -288,10 +304,30 @@ function AsignarAula() {
           ))}
         </select>
 
+        <input
+          className="aulas-form-input"
+          type="date"
+          name="fecha_inicio"
+          value={form.fecha_inicio}
+          onChange={handleFormChange}
+          required
+        />
+
+        <input
+          className="aulas-form-input"
+          type="date"
+          name="fecha_fin"
+          value={form.fecha_fin}
+          onChange={handleFormChange}
+          placeholder="Fecha fin (opcional)"
+        />
+
         <button
           type="submit"
           className="aulas-btn"
-          disabled={loading || !form.id_estudiante || !form.id_aula}
+          disabled={
+            loading || !form.id_estudiante || !form.id_aula || !form.fecha_inicio
+          }
         >
           {loading ? "Asignando..." : "Asignar"}
         </button>
@@ -432,6 +468,16 @@ function AsignarAula() {
                     type="date"
                     name="fecha_inicio_nueva"
                     value={modalData.fecha_inicio_nueva}
+                    onChange={handleModalChange}
+                    className="aulas-form-input"
+                  />
+                </div>
+                <div className="modal-field">
+                  <label>Fecha fin en aula destino (opcional)</label>
+                  <input
+                    type="date"
+                    name="fecha_fin_nueva"
+                    value={modalData.fecha_fin_nueva}
                     onChange={handleModalChange}
                     className="aulas-form-input"
                   />

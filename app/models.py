@@ -1,6 +1,6 @@
 # app/models.py
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import date
 
 # ============================
@@ -175,3 +175,26 @@ class CambiarTutorAulaIn(BaseModel):
     motivo_cambio: str
     id_tutor_aula_actual: int
     fecha_fin_actual: Optional[str] = None
+
+
+class ReporteAsistenciaAulaItem(BaseModel):
+    institucion: Optional[str]
+    id_aula: int
+    grado: Optional[str]
+    numero_semana: Optional[int]
+    fecha_clase: Optional[str]
+    es_festivo: Optional[str]
+    dia_semana: Optional[str]
+    hora_inicio: Optional[str]
+    hora_fin: Optional[str]
+    tutor: Optional[str]
+    dictada: Optional[str]
+    horas_dictadas: float
+    horas_no_dictadas: float
+    motivo_inasistencia: Optional[str]
+    reposicion: Optional[str]
+    fecha_reposicion: Optional[str]
+
+
+class ReporteAsistenciaAulaResponse(BaseModel):
+    items: List[ReporteAsistenciaAulaItem]

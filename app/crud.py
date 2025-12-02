@@ -1,17 +1,16 @@
 # app/crud.py
-from typing import Optional
+from typing import Optional, Tuple
 from app.db import get_conn
 import oracledb
 import secrets
 from datetime import date, datetime, timedelta
-from typing import Optional, Tuple
 
 # ============================
 # INSTITUCION
 # ============================
 
 def create_institucion(data: dict):
-    """Crea una institución validando que el nombre sea único"""
+    """Crea una institución validando que el nombre sea único y usando RETURNING INTO."""
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -21,14 +20,16 @@ def create_institucion(data: dict):
         if cur.fetchone()[0] > 0:
             return {"error": "Ya existe una institución con ese nombre"}
         
+        # Usar RETURNING INTO para obtener el ID de forma atómica y eficiente
+        id_institucion_var = cur.var(oracledb.NUMBER)
         cur.execute("""INSERT INTO INSTITUCION(nombre_inst, jornada, dir_principal)
-                       VALUES (:1,:2,:3)""",
-                    (data['nombre_inst'], data.get('jornada'), data.get('dir_principal')))
+                        VALUES (:1,:2,:3)
+                        RETURNING id_institucion INTO :4""",
+                    (data['nombre_inst'], data.get('jornada'), data.get('dir_principal'), id_institucion_var))
         conn.commit()
-        cur.execute("SELECT id_institucion FROM INSTITUCION WHERE nombre_inst = :1", 
-                    (data['nombre_inst'],))
-        r = cur.fetchone()
-        return {"ok": True, "id_institucion": r[0]} if r else {"error": "No se pudo obtener el ID"}
+        
+        id_institucion = id_institucion_var.getvalue()[0]
+        return {"ok": True, "id_institucion": id_institucion}
     except Exception as e:
         return {"error": str(e)}
     finally:
@@ -598,19 +599,19 @@ def delete_horario(id_horario: int):
     finally:
         cur.close()
         conn.close()
-        
+
+
 def validar_horario_aula(id_aula, id_horario, fecha_inicio):
     conn = get_conn()
     cur = conn.cursor()
 
-    # Obtener grado y jornada del aula/sede/institución
+    # 1. Grado y jornada del aula
     cur.execute("""
         SELECT a.grado, i.jornada
         FROM AULA a
         JOIN INSTITUCION i ON a.id_institucion = i.id_institucion
         WHERE a.id_aula = :1
     """, (id_aula,))
-
     row = cur.fetchone()
     if not row:
         cur.close()
@@ -618,118 +619,189 @@ def validar_horario_aula(id_aula, id_horario, fecha_inicio):
         return False, "Aula o sede no encontrada."
     grado, jornada = row
 
-    # Obtener datos del horario nuevo
-    cur.execute("SELECT dia_semana, h_inicio, h_final, minutos_equiv FROM HORARIO WHERE id_horario = :1", (id_horario,))
+    # Normalizar grado a int
+    try:
+        grado_int = int(str(grado).strip())
+    except ValueError:
+        grado_int = None
+
+    # Normalizar fecha_inicio a date
+    fecha_new = datetime.strptime(fecha_inicio[:10], "%Y-%m-%d").date()
+
+    # 2. Datos del horario nuevo
+    cur.execute("""
+        SELECT dia_semana, h_inicio, h_final, minutos_equiv
+        FROM HORARIO
+        WHERE id_horario = :1
+    """, (id_horario,))
     row = cur.fetchone()
     if not row:
         cur.close()
         conn.close()
         return False, "El horario no existe."
     dia_semana_new, h_inicio_new, h_final_new, min_equiv_new = row
+    min_equiv_new = min_equiv_new or 60  # tamaño de la hora equivalente
 
-    # Definición de rangos de jornada
+    # --- utilidades ---
     rango_maniana_inicio = "06:00"
-    rango_maniana_fin = "13:00"
-    rango_tarde_inicio = "13:00"
-    rango_tarde_fin = "18:00"
+    rango_maniana_fin    = "13:00"
+    rango_tarde_inicio   = "13:00"
+    rango_tarde_fin      = "18:00"
 
-    dias_primaria = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
-    dias_secundaria = dias_primaria + ["Sábado"]
+    dias_primaria   = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes")
+    dias_secundaria = dias_primaria + ("Sábado",)
 
     def en_rango(h, inicio, fin):
-        return inicio <= h < fin
+        return inicio <= h <= fin
 
-    # Validaciones por grado/jornada
-    if grado in ("4", "5"):
+    def to_mins(hhmm: str) -> int:
+        h, m = map(int, hhmm.split(":"))
+        return h * 60 + m
+
+    # Duración real de la franja
+    duracion_min = to_mins(h_final_new) - to_mins(h_inicio_new)
+
+    # 2.1 Límite de duración de UNA franja
+    if grado_int in (4, 5) and duracion_min > 120:
+        cur.close()
+        conn.close()
+        return False, "Para 4° y 5° cada franja no puede exceder 2 horas continuas."
+    if grado_int in (9, 10) and duracion_min > 180:
+        cur.close()
+        conn.close()
+        return False, "Para 9° y 10° cada franja no puede exceder 3 horas continuas."
+
+    # 2.2 Reglas de jornada/días
+    if grado_int in (4, 5):
         if dia_semana_new not in dias_primaria:
             cur.close()
             conn.close()
-            return False, "Solo lunes a viernes para 4º/5º."
-        if jornada == "MAÑANA" and not (en_rango(h_inicio_new, rango_maniana_inicio, rango_maniana_fin) and en_rango(h_final_new, rango_maniana_inicio, rango_maniana_fin)):
+            return False, "Solo lunes a viernes para 4° y 5°."
+        if jornada == "MAÑANA" and not (
+            en_rango(h_inicio_new, rango_maniana_inicio, rango_maniana_fin)
+            and en_rango(h_final_new,  rango_maniana_inicio, rango_maniana_fin)
+        ):
             cur.close()
             conn.close()
-            return False, "En 4º/5º con jornada MAÑANA: horario debe estar entre 06:00 y 13:00."
-        elif jornada == "TARDE" and not (en_rango(h_inicio_new, rango_tarde_inicio, rango_tarde_fin) and en_rango(h_final_new, rango_tarde_inicio, rango_tarde_fin)):
+            return False, "En 4°-5° con jornada MAÑANA el horario debe estar entre 06:00 y 13:00."
+        if jornada == "TARDE" and not (
+            en_rango(h_inicio_new, rango_tarde_inicio, rango_tarde_fin)
+            and en_rango(h_final_new,  rango_tarde_inicio, rango_tarde_fin)
+        ):
             cur.close()
             conn.close()
-            return False, "En 4º/5º con jornada TARDE: horario debe estar entre 13:00 y 18:00."
-        # MIXTA permite ambos rangos
-    elif grado in ("9", "10"):
+            return False, "En 4°-5° con jornada TARDE el horario debe estar entre 13:00 y 18:00."
+
+    elif grado_int in (9, 10):
         if dia_semana_new not in dias_secundaria:
             cur.close()
             conn.close()
-            return False, "Solo lunes a sábado para 9º/10º."
-        if jornada == "MAÑANA" and not (en_rango(h_inicio_new, rango_tarde_inicio, rango_tarde_fin) and en_rango(h_final_new, rango_tarde_inicio, rango_tarde_fin)):
+            return False, "Solo lunes a sábado para 9° y 10°."
+        if jornada == "MAÑANA" and not (
+            en_rango(h_inicio_new, rango_tarde_inicio, rango_tarde_fin)
+            and en_rango(h_final_new,  rango_tarde_inicio, rango_tarde_fin)
+        ):
             cur.close()
             conn.close()
-            return False, "En 9º/10º con jornada MAÑANA: horario debe estar en la TARDE."
-        elif jornada == "TARDE" and not (en_rango(h_inicio_new, rango_maniana_inicio, rango_maniana_fin) and en_rango(h_final_new, rango_maniana_inicio, rango_maniana_fin)):
+            return False, "En 9°-10° con jornada MAÑANA el horario debe estar en la TARDE (13:00–18:00)."
+        if jornada == "TARDE" and not (
+            en_rango(h_inicio_new, rango_maniana_inicio, rango_maniana_fin)
+            and en_rango(h_final_new,  rango_maniana_inicio, rango_maniana_fin)
+        ):
             cur.close()
             conn.close()
-            return False, "En 9º/10º con jornada TARDE: horario debe estar en la MAÑANA."
-        # MIXTA permite ambas
+            return False, "En 9°-10° con jornada TARDE el horario debe estar en la MAÑANA (06:00–13:00)."
+    # MIXTA permite ambas franjas
 
-    # Validar cruce y duplicidad EXACTA de horario
+    # 3. Duplicidad / solapamiento con horarios ACTIVOS
     cur.execute("""
         SELECT ho.dia_semana, ho.h_inicio, ho.h_final, ho.id_horario
         FROM HISTORICO_HORARIO_AULA ha
         JOIN HORARIO ho ON ha.id_horario = ho.id_horario
-        WHERE ha.id_aula = :1 AND ha.fecha_fin IS NULL
+        WHERE ha.id_aula = :1
+          AND ha.fecha_fin IS NULL
     """, (id_aula,))
-    def to_mins(h): return int(h[:2]) * 60 + int(h[3:])
+
     ini_new = to_mins(h_inicio_new)
     fin_new = to_mins(h_final_new)
-    for dia_exist, h_ini_exist, h_fin_exist, id_horario_exist in cur.fetchall():
+
+    for dia_exist, h_ini_exist, h_fin_exist, _ in cur.fetchall():
         ini_exist = to_mins(h_ini_exist)
         fin_exist = to_mins(h_fin_exist)
-        # Duplicidad exacta
+
         if dia_exist == dia_semana_new and ini_new == ini_exist and fin_new == fin_exist:
             cur.close()
             conn.close()
             return False, "El horario ya está asignado a esta aula para ese día y franja."
-        # Solapamiento parcial
+
         if dia_exist == dia_semana_new and ini_new < fin_exist and fin_new > ini_exist:
             cur.close()
             conn.close()
-            return False, f"Cruce con horario existente ({dia_exist} {h_ini_exist}-{h_fin_exist})."
+            return False, f"Cruce con horario existente: {dia_exist} {h_ini_exist}-{h_fin_exist}."
 
-    # Valida suma máxima de horas equivalentes
+    # 3.b No reutilizar MISMA franja dentro de un rango de fechas ya usado (históricos finalizados)
+    cur.execute("""
+        SELECT hha.fecha_inicio, hha.fecha_fin
+        FROM HISTORICO_HORARIO_AULA hha
+        JOIN HORARIO ho ON hha.id_horario = ho.id_horario
+        WHERE hha.id_aula = :1
+          AND hha.fecha_fin IS NOT NULL
+          AND ho.dia_semana = :2
+          AND ho.h_inicio   = :3
+          AND ho.h_final    = :4
+    """, (id_aula, dia_semana_new, h_inicio_new, h_final_new))
+
+    for f_ini, f_fin in cur.fetchall():
+        ini = f_ini.date() if hasattr(f_ini, "date") else f_ini
+        fin = f_fin.date() if hasattr(f_fin, "date") else f_fin
+        if ini <= fecha_new <= fin:
+            cur.close()
+            conn.close()
+            return False, (
+                "Ya existe un historial para este mismo horario entre "
+                f"{ini} y {fin}; no puede volver a usarse dentro de ese rango."
+            )
+
+    # 4. Tope de horas equivalentes VIGENTES en la fecha de inicio
     cur.execute("""
         SELECT ho.minutos_equiv
         FROM HISTORICO_HORARIO_AULA ha
         JOIN HORARIO ho ON ha.id_horario = ho.id_horario
-        WHERE ha.id_aula = :1 AND ha.fecha_fin IS NULL
-    """, (id_aula,))
-    total_equiv = sum((r[0] if r[0] else 45) for r in cur.fetchall()) + (min_equiv_new if min_equiv_new else 45)
-    if grado in ("4", "5"):
-        max_equiv = 2 * 45   # dos horas equivalentes
-    elif grado in ("9", "10"):
-        max_equiv = 3 * 45   # tres horas equivalentes
+        WHERE ha.id_aula = :1
+          AND ha.fecha_inicio <= TO_DATE(:2, 'YYYY-MM-DD')
+          AND (ha.fecha_fin IS NULL OR ha.fecha_fin >= TO_DATE(:3, 'YYYY-MM-DD'))
+    """, (id_aula, fecha_inicio[:10], fecha_inicio[:10]))
+
+    total_equiv = sum(r[0] for r in cur.fetchall() if r[0] is not None)
+
+    if grado_int in (4, 5):
+        max_equiv = 2 * 60      # 2 horas equivalentes
+    elif grado_int in (9, 10):
+        max_equiv = 3 * 60      # 3 horas equivalentes
     else:
-        max_equiv = 3 * 45
-    if total_equiv > max_equiv:
+        max_equiv = 3 * 60
+
+    if total_equiv + min_equiv_new > max_equiv:
         cur.close()
         conn.close()
-        return False, f"Supera el máximo de horas equivalentes permitidas ({max_equiv // 45} horas)"
+        return False, f"Supera el máximo de horas equivalentes permitidas ({max_equiv // 60} horas)."
 
     cur.close()
     conn.close()
     return True, "OK"
-
 # ============================
 # HISTÓRICO HORARIO AULA
 # ============================
 
 def asignar_horario_aula(data):
-    id_aula = data['id_aula']
-    id_horario = data['id_horario']
-    fecha_inicio = data['fecha_inicio']
+    id_aula = data["id_aula"]
+    id_horario = data["id_horario"]
+    fecha_inicio = data["fecha_inicio"]
 
     valido, msg = validar_horario_aula(id_aula, id_horario, fecha_inicio)
     if not valido:
         return {"error": msg}
-    
-    # Realiza insert como antes
+
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -741,10 +813,8 @@ def asignar_horario_aula(data):
     conn.close()
     return {"msg": "Horario asignado correctamente."}
 
+
 def get_historial_horarios_aula(id_aula: int, limit=200):
-    """
-    Devuelve el historial de horarios de un aula con datos del horario.
-    """
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -773,7 +843,7 @@ def get_historial_horarios_aula(id_aula: int, limit=200):
                 "id_aula": r[1],
                 "id_horario": r[2],
                 "fecha_inicio": r[3],
-                "fecha_fin": r[4],           # puede ser None
+                "fecha_fin": r[4],
                 "dia_semana": r[5],
                 "h_inicio": r[6],
                 "h_final": r[7],
@@ -785,6 +855,7 @@ def get_historial_horarios_aula(id_aula: int, limit=200):
     finally:
         cur.close()
         conn.close()
+
 
 def finalizar_historial_horario(id_hist_horario: int, fecha_fin: Optional[str] = None):
     """
@@ -908,6 +979,26 @@ def list_tutores_aula(id_aula: int):
         cur.close()
         conn.close()
 
+def aula_tiene_tutor_activo_en_fecha(id_aula: int, fecha: str) -> bool:
+    """
+    ¿Hay alguna asignación en ese aula vigente en la fecha dada (YYYY-MM-DD)?
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM TUTOR_AULA ta
+            JOIN ASIGNACION_TUTOR at ON ta.id_tutor_aula = at.id_tutor_aula
+            WHERE ta.id_aula = :id_aula
+              AND at.fecha_inicio <= TO_DATE(:fecha, 'YYYY-MM-DD')
+              AND (at.fecha_fin IS NULL OR at.fecha_fin >= TO_DATE(:fecha, 'YYYY-MM-DD'))
+        """, {"id_aula": id_aula, "fecha": fecha[:10]})
+        (count,) = cur.fetchone()
+        return count > 0
+    finally:
+        cur.close()
+        conn.close()
 
 def aula_tiene_tutor_activo(id_aula: int) -> bool:
     """
@@ -1009,21 +1100,16 @@ def hay_cruce_horario_tutor(id_persona: int, id_aula_nueva: int, fecha_inicio_nu
 
     return False
 
-
 def asignar_tutor_aula(data: dict):
-    """
-    Asigna tutor SOLO si el aula NO tiene tutor activo
-    y no hay cruce de horario con otras aulas activas de ese tutor.
-    Inserta en ASIGNACION_TUTOR y vincula en TUTOR_AULA.
-    """
     id_persona = int(data["id_persona"])
     id_aula = int(data["id_aula"])
     fecha_inicio = str(data["fecha_inicio"])[:10]
+    fecha_fin = data.get("fecha_fin")  # puede ser None
 
-    # 1) Validar que el aula no tenga tutor activo
-    if aula_tiene_tutor_activo(id_aula):
+    # 1) Validar que el aula no tenga tutor en esa fecha
+    if aula_tiene_tutor_activo_en_fecha(id_aula, fecha_inicio):
         return {
-            "error": "El aula ya tiene un tutor activo. Use la opción de 'Finalizar y cambiar tutor'."
+            "error": "El aula ya tiene un tutor asignado en esa fecha. Ajuste el historial primero."
         }
 
     # 2) Validar cruce de horarios con otras aulas del tutor
@@ -1036,11 +1122,19 @@ def asignar_tutor_aula(data: dict):
     cur = conn.cursor()
     try:
         new_id = cur.var(oracledb.NUMBER)
-        cur.execute("""
-            INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, motivo_cambio)
-            VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), NULL)
-            RETURNING id_tutor_aula INTO :3
-        """, (id_persona, fecha_inicio, new_id))
+        if fecha_fin:
+            cur.execute("""
+                INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, fecha_fin, motivo_cambio)
+                VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), TO_DATE(:3, 'YYYY-MM-DD'), NULL)
+                RETURNING id_tutor_aula INTO :4
+            """, (id_persona, fecha_inicio, fecha_fin[:10], new_id))
+        else:
+            cur.execute("""
+                INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, motivo_cambio)
+                VALUES (:1, TO_DATE(:2, 'YYYY-MM-DD'), NULL)
+                RETURNING id_tutor_aula INTO :3
+            """, (id_persona, fecha_inicio, new_id))
+
         id_tutor_aula = int(new_id.getvalue()[0])
 
         cur.execute("""
@@ -1054,19 +1148,19 @@ def asignar_tutor_aula(data: dict):
         cur.close()
         conn.close()
 
-
 def cambiar_tutor_aula(data: dict):
-    """
-    Finaliza tutor actual de esa aula y crea nueva asignación para el nuevo tutor.
-    El motivo se guarda SOLO en la asignación que se cierra.
-    Antes de crear la nueva se valida cruce de horarios con otras aulas activas del tutor.
-    """
     id_aula = int(data["id_aula"])
     id_persona_nuevo = int(data["id_persona"])
     fecha_inicio_nuevo = str(data["fecha_inicio"])[:10]
     motivo = data["motivo_cambio"]
     id_tutor_aula_actual = int(data["id_tutor_aula_actual"])
     fecha_fin_actual = data.get("fecha_fin_actual")
+
+    # El aula no puede quedar con dos tutores en la misma fecha de inicio
+    if aula_tiene_tutor_activo_en_fecha(id_aula, fecha_inicio_nuevo):
+        return {
+            "error": "El aula ya tiene un tutor asignado en esa fecha. Ajuste la fecha de fin del tutor actual."
+        }
 
     # Validar cruce de horarios para el nuevo tutor
     if hay_cruce_horario_tutor(id_persona_nuevo, id_aula, fecha_inicio_nuevo):
@@ -1077,7 +1171,7 @@ def cambiar_tutor_aula(data: dict):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # 1) cerrar asignación actual (motivo solo aquí)
+        # 1) cerrar asignación actual
         if fecha_fin_actual:
             cur.execute("""
                 UPDATE ASIGNACION_TUTOR
@@ -1095,7 +1189,7 @@ def cambiar_tutor_aula(data: dict):
                   AND fecha_fin IS NULL
             """, (motivo, id_tutor_aula_actual))
 
-        # 2) nueva asignación (sin motivo)
+        # 2) nueva asignación
         new_id = cur.var(oracledb.NUMBER)
         cur.execute("""
             INSERT INTO ASIGNACION_TUTOR (id_persona, fecha_inicio, motivo_cambio)
@@ -1117,7 +1211,6 @@ def cambiar_tutor_aula(data: dict):
     finally:
         cur.close()
         conn.close()
-
 
 def finalizar_asignacion_tutor(
     id_tutor_aula: int,
@@ -1196,31 +1289,165 @@ def validar_cambio_grado(id_aula_origen: int, id_aula_destino: int) -> tuple[boo
 
     return False, "El estudiante solo puede moverse entre aulas 4°-5° o entre 9°-10°. No se permiten cruces entre otros grados."
 
+def existe_asignacion_en_rango(id_estudiante: int, id_aula: int, fecha_ini: str, fecha_fin: Optional[str]) -> bool:
+    """
+    True si ya existe en HISTORICO_AULA_ESTUDIANTE una fila para ese estudiante y aula
+    cuyo rango [fecha_inicio, fecha_fin] se solape con [fecha_ini, fecha_fin_nueva].
+    Si fecha_fin_nueva es None, se toma como 'abierta' hacia el futuro.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        if fecha_fin:
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM HISTORICO_AULA_ESTUDIANTE
+                WHERE id_estudiante = :id_est
+                  AND id_aula = :id_aula
+                  AND (
+                        (fecha_fin IS NULL AND fecha_inicio <= TO_DATE(:f_fin, 'YYYY-MM-DD'))
+                        OR
+                        (fecha_fin IS NOT NULL AND fecha_inicio <= TO_DATE(:f_fin, 'YYYY-MM-DD')
+                         AND fecha_fin >= TO_DATE(:f_ini, 'YYYY-MM-DD'))
+                      )
+            """, {
+                "id_est": id_estudiante,
+                "id_aula": id_aula,
+                "f_ini": fecha_ini[:10],
+                "f_fin": fecha_fin[:10],
+            })
+        else:
+            # nueva asignación abierta: solapa con cualquier rango que termine después de fecha_ini
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM HISTORICO_AULA_ESTUDIANTE
+                WHERE id_estudiante = :id_est
+                  AND id_aula = :id_aula
+                  AND (
+                        fecha_fin IS NULL
+                        OR fecha_fin >= TO_DATE(:f_ini, 'YYYY-MM-DD')
+                      )
+                  AND fecha_inicio <= TO_DATE(:f_fin, 'YYYY-MM-DD')
+            """, {
+                "id_est": id_estudiante,
+                "id_aula": id_aula,
+                "f_ini": fecha_ini[:10],
+                "f_fin": fecha_ini[:10],
+            })
+        (count,) = cur.fetchone()
+        return count > 0
+    finally:
+        cur.close()
+        conn.close()
+
+
 def asignar_estudiante_aula(data):
     conn = get_conn()
     cur = conn.cursor()
-    # Verificar si ya tiene una asignación activa
+
+    id_est = int(data["id_estudiante"])
+    id_aula = int(data["id_aula"])
+    fecha_ini = str(data.get("fecha_inicio") or date.today().isoformat())[:10]
+    fecha_fin = data.get("fecha_fin")  # opcional
+
+    # No puede tener otra asignación activa en CUALQUIER aula
     cur.execute("""
-        SELECT COUNT(*) FROM HISTORICO_AULA_ESTUDIANTE
+        SELECT COUNT(*)
+        FROM HISTORICO_AULA_ESTUDIANTE
         WHERE id_estudiante = :1 AND fecha_fin IS NULL
-    """, (data['id_estudiante'],))
+    """, (id_est,))
     if cur.fetchone()[0] > 0:
         cur.close()
         conn.close()
         return {"error": "El estudiante ya pertenece a un aula activa."}
 
-    fecha = data.get('fecha_inicio')
-    if not fecha:
-        fecha = date.today().isoformat()
+    # No puede estar ya asignado a ESTA aula en un rango que se solape
+    if existe_asignacion_en_rango(id_est, id_aula, fecha_ini, fecha_fin):
+        cur.close()
+        conn.close()
+        return {"error": "El estudiante ya tiene historial en esta aula que se cruza con el rango indicado."}
 
-    cur.execute("""
-        INSERT INTO HISTORICO_AULA_ESTUDIANTE (id_estudiante, id_aula, fecha_inicio)
-        VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'))
-    """, (data['id_estudiante'], data['id_aula'], fecha))
+    # Insert con fecha_fin opcional
+    if fecha_fin:
+        cur.execute("""
+            INSERT INTO HISTORICO_AULA_ESTUDIANTE (id_estudiante, id_aula, fecha_inicio, fecha_fin)
+            VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), TO_DATE(:4, 'YYYY-MM-DD'))
+        """, (id_est, id_aula, fecha_ini, fecha_fin[:10]))
+    else:
+        cur.execute("""
+            INSERT INTO HISTORICO_AULA_ESTUDIANTE (id_estudiante, id_aula, fecha_inicio)
+            VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'))
+        """, (id_est, id_aula, fecha_ini))
+
     conn.commit()
     cur.close()
     conn.close()
     return {"msg": "Estudiante asignado correctamente"}
+
+
+def cambiar_estudiante_aula(data: dict):
+    """
+    Cierra la asignación actual y crea una nueva en otra aula,
+    validando reglas de grado y que no haya solape en el aula destino.
+    """
+    id_hist = int(data["id_hist_aula_est"])
+    id_aula_origen = int(data["id_aula_origen"])
+    id_aula_destino = int(data["id_aula_destino"])
+    id_estudiante = int(data["id_estudiante"])
+    fecha_fin_actual = data.get("fecha_fin_actual")
+    fecha_inicio_nueva = data.get("fecha_inicio_nueva")
+    fecha_fin_nueva = data.get("fecha_fin_nueva")  # opcional, nuevo campo
+
+    if not fecha_inicio_nueva:
+        return {"error": "Debe indicar la fecha de inicio en el aula de destino."}
+
+    es_valido, msg = validar_cambio_grado(id_aula_origen, id_aula_destino)
+    if not es_valido:
+        return {"error": msg}
+
+    # Validar que no haya solape en el aula destino
+    if existe_asignacion_en_rango(id_estudiante, id_aula_destino, fecha_inicio_nueva, fecha_fin_nueva):
+        return {"error": "El estudiante ya tiene un historial en el aula destino que se cruza con el rango indicado."}
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        # cerrar asignación actual
+        if fecha_fin_actual:
+            cur.execute("""
+                UPDATE HISTORICO_AULA_ESTUDIANTE
+                SET fecha_fin = TO_DATE(:1, 'YYYY-MM-DD')
+                WHERE id_hist_aula_est = :2
+                  AND fecha_fin IS NULL
+            """, (fecha_fin_actual, id_hist))
+        else:
+            cur.execute("""
+                UPDATE HISTORICO_AULA_ESTUDIANTE
+                SET fecha_fin = SYSDATE
+                WHERE id_hist_aula_est = :1
+                  AND fecha_fin IS NULL
+            """, (id_hist,))
+
+        if cur.rowcount == 0:
+            raise Exception("No se encontró una asignación activa para ese estudiante en esa aula.")
+
+        # insertar nueva asignación en aula destino
+        if fecha_fin_nueva:
+            cur.execute("""
+                INSERT INTO HISTORICO_AULA_ESTUDIANTE (id_estudiante, id_aula, fecha_inicio, fecha_fin)
+                VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), TO_DATE(:4, 'YYYY-MM-DD'))
+            """, (id_estudiante, id_aula_destino, fecha_inicio_nueva, fecha_fin_nueva[:10]))
+        else:
+            cur.execute("""
+                INSERT INTO HISTORICO_AULA_ESTUDIANTE (id_estudiante, id_aula, fecha_inicio)
+                VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'))
+            """, (id_estudiante, id_aula_destino, fecha_inicio_nueva))
+
+        conn.commit()
+        return {"msg": "Estudiante movido de aula respetando el historial."}
+    finally:
+        cur.close()
+        conn.close()
 
 def listar_estudiantes_de_aula(id_aula: int):
     conn = get_conn()
@@ -1232,8 +1459,8 @@ def listar_estudiantes_de_aula(id_aula: int):
                 e.id_estudiante,
                 e.nombres,
                 e.apellidos,
-                h.fecha_inicio,
-                h.fecha_fin
+                TO_CHAR(h.fecha_inicio, 'YYYY-MM-DD') AS fecha_inicio,
+                TO_CHAR(h.fecha_fin,    'YYYY-MM-DD') AS fecha_fin
             FROM HISTORICO_AULA_ESTUDIANTE h
             JOIN ESTUDIANTE e ON h.id_estudiante = e.id_estudiante
             WHERE h.id_aula = :1
@@ -1246,15 +1473,15 @@ def listar_estudiantes_de_aula(id_aula: int):
                 id_estudiante=r[1],
                 nombres=r[2],
                 apellidos=r[3],
-                fecha_inicio=r[4].strftime("%Y-%m-%d") if r[4] else None,
-                fecha_fin=r[5].strftime("%Y-%m-%d") if r[5] else None,
+                fecha_inicio=r[4],
+                fecha_fin=r[5],
             )
             for r in rows
         ]
     finally:
         cur.close()
         conn.close()
-
+        
 def finalizar_asignacion_estudiante(id_hist_aula_est: int, fecha_fin: str | None = None):
     """
     Marca una fila de HISTORICO_AULA_ESTUDIANTE como finalizada (fecha_fin).
@@ -1285,75 +1512,21 @@ def finalizar_asignacion_estudiante(id_hist_aula_est: int, fecha_fin: str | None
         cur.close()
         conn.close()
 
-def cambiar_estudiante_aula(data: dict):
-    """
-    Cierra la asignación actual (id_hist_aula_est) y crea una nueva en otra aula,
-    validando las reglas de grado.
-    data:
-      - id_hist_aula_est: histórico actual
-      - id_aula_origen
-      - id_aula_destino
-      - id_estudiante
-      - fecha_fin_actual (opcional)
-      - fecha_inicio_nueva (obligatoria)
-    """
-    id_hist = int(data["id_hist_aula_est"])
-    id_aula_origen = int(data["id_aula_origen"])
-    id_aula_destino = int(data["id_aula_destino"])
-    id_estudiante = int(data["id_estudiante"])
-    fecha_fin_actual = data.get("fecha_fin_actual")
-    fecha_inicio_nueva = data.get("fecha_inicio_nueva")
 
-    if not fecha_inicio_nueva:
-        return {"error": "Debe indicar la fecha de inicio en el aula de destino."}
-
-    es_valido, msg = validar_cambio_grado(id_aula_origen, id_aula_destino)
-    if not es_valido:
-        return {"error": msg}
-
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        # cerrar asignación actual
-        if fecha_fin_actual:
-            cur.execute("""
-                UPDATE HISTORICO_AULA_ESTUDIANTE
-                SET fecha_fin = TO_DATE(:1, 'YYYY-MM-DD')
-                WHERE id_hist_aula_est = :2
-                  AND fecha_fin IS NULL
-            """, (fecha_fin_actual, id_hist))
-        else:
-            cur.execute("""
-                UPDATE HISTORICO_AULA_ESTUDIANTE
-                SET fecha_fin = SYSDATE
-                WHERE id_hist_aula_est = :1
-                  AND fecha_fin IS NULL
-            """, (id_hist,))
-
-        if cur.rowcount == 0:
-            raise Exception("No se encontró una asignación activa para ese estudiante en esa aula.")
-
-        # insertar nueva asignación en aula destino
-        cur.execute("""
-            INSERT INTO HISTORICO_AULA_ESTUDIANTE (id_estudiante, id_aula, fecha_inicio)
-            VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'))
-        """, (id_estudiante, id_aula_destino, fecha_inicio_nueva))
-
-        conn.commit()
-        return {"msg": "Estudiante movido de aula respetando el historial."}
-    finally:
-        cur.close()
-        conn.close()
 
 # ============================
 # HORARIOS POR TUTOR
 # ============================
-def list_horario_tutor(id_persona):
+def list_horario_tutor(id_persona: int):
+    """
+    Historial de horarios por tutor con el esquema:
+    ASIGNACION_TUTOR, TUTOR_AULA, AULA, HISTORICO_HORARIO_AULA, HORARIO.
+    """
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT 
+            SELECT
                 at.id_tutor_aula,
                 a.id_aula,
                 a.grado,
@@ -1362,36 +1535,50 @@ def list_horario_tutor(id_persona):
                 h.h_final,
                 h.minutos_equiv,
                 h.es_continuo,
-                hha.fecha_inicio
+                at.fecha_inicio    AS fecha_ini_tutor,
+                at.fecha_fin       AS fecha_fin_tutor,
+                hha.fecha_inicio   AS fecha_ini_horario,
+                hha.fecha_fin      AS fecha_fin_horario
             FROM ASIGNACION_TUTOR at
-            JOIN TUTOR_AULA ta 
+            JOIN TUTOR_AULA ta
                   ON ta.id_tutor_aula = at.id_tutor_aula
-            JOIN AULA a 
+            JOIN AULA a
                   ON a.id_aula = ta.id_aula
-            JOIN HISTORICO_HORARIO_AULA hha 
-                  ON a.id_aula = hha.id_aula 
-                 AND hha.fecha_fin IS NULL
-            JOIN HORARIO h 
+            JOIN HISTORICO_HORARIO_AULA hha
+                  ON hha.id_aula = a.id_aula
+            JOIN HORARIO h
                   ON hha.id_horario = h.id_horario
-            WHERE at.id_persona = :1
-              AND at.fecha_fin IS NULL
-            ORDER BY h.dia_semana, h.h_inicio
-        """, (id_persona,))
+            WHERE at.id_persona = :idp
+            ORDER BY a.id_aula, h.dia_semana, h.h_inicio, at.fecha_inicio
+        """, {"idp": id_persona})
         rows = cur.fetchall()
-        return [
-            dict(
-                id_tutor_aula=r[0],
-                id_aula=r[1],
-                grado=r[2],
-                dia_semana=r[3],
-                h_inicio=r[4],
-                h_final=r[5],
-                minutos_equiv=r[6],
-                es_continuo=r[7],
-                fecha_inicio=str(r[8]) if r[8] else None,
-            )
-            for r in rows
-        ]
+
+        def fmt(d):
+            return d.strftime("%Y-%m-%d") if d else None
+
+        result = []
+        for r in rows:
+            id_tutor_aula, id_aula, grado, dia_sem, h_ini, h_fin, min_equiv, es_cont, \
+            f_ini_tutor, f_fin_tutor, f_ini_hor, f_fin_hor = r
+
+            h_ini_str = h_ini if isinstance(h_ini, str) else h_ini.strftime("%H:%M")
+            h_fin_str = h_fin if isinstance(h_fin, str) else h_fin.strftime("%H:%M")
+
+            result.append({
+                "id_tutor_aula": id_tutor_aula,
+                "id_aula": id_aula,
+                "grado": grado,
+                "dia_semana": dia_sem,
+                "h_inicio": h_ini_str,
+                "h_final": h_fin_str,
+                "minutos_equiv": min_equiv,
+                "es_continuo": es_cont,
+                "fecha_ini_tutor": fmt(f_ini_tutor),
+                "fecha_fin_tutor": fmt(f_fin_tutor),
+                "fecha_ini_horario": fmt(f_ini_hor),
+                "fecha_fin_horario": fmt(f_fin_hor),
+            })
+        return result
     finally:
         cur.close()
         conn.close()
@@ -2996,3 +3183,104 @@ def guardar_notas_tutor_periodo(id_persona: int, id_periodo: int, notas: list[di
         cur.close()
         conn.close()
 
+def reporte_asistencia_aula(id_aula: int,
+                            fecha_inicio: str | None = None,
+                            fecha_fin: str | None = None):
+    """
+    Reporte de asistencia general del aula, opcionalmente filtrado por rango de fechas.
+    """
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        sql = """
+        SELECT 
+          inst.nombre_inst, 
+          au.id_aula,
+          au.grado,
+          aa.id_asist, 
+          aa.fecha_clase,
+          aa.hora_inicio,
+          CASE WHEN f.id_festivo IS NOT NULL THEN 'S' ELSE 'N' END as es_festivo,
+          h.dia_semana,
+          h.h_inicio,
+          h.h_final,
+          aa.dictada,
+          aa.horas_dictadas,
+          (NVL(h.minutos_equiv,0)/60) - NVL(aa.horas_dictadas,0) AS horas_no_dictadas,
+          m.descripcion AS motivo_inasistencia,
+          aa.reposicion,
+          aa.fecha_reposicion,
+          s.numero_semana
+        FROM ASISTENCIA_AULA aa
+        JOIN AULA au               ON aa.id_aula = au.id_aula
+        JOIN INSTITUCION inst      ON au.id_institucion = inst.id_institucion
+        LEFT JOIN FESTIVO f        ON TRUNC(aa.fecha_clase) = f.fecha
+        LEFT JOIN HORARIO h        ON aa.id_horario = h.id_horario
+        LEFT JOIN MOTIVO_INASISTENCIA m 
+                                   ON aa.id_motivo = m.id_motivo
+        LEFT JOIN SEMANA s         ON s.id_semana = aa.id_semana
+        WHERE au.id_aula = :1
+        """
+
+        params = [id_aula]
+
+        # Rango de fechas opcional
+        if fecha_inicio and fecha_fin:
+            # convertir a date de Python
+            f_ini = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            f_fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            sql += " AND aa.fecha_clase BETWEEN :2 AND :3"
+            params.extend([f_ini, f_fin])
+
+        sql += " ORDER BY aa.fecha_clase, aa.hora_inicio"
+
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        cols = [c[0].lower() for c in cur.description]
+
+        resultado = []
+        for r in rows:
+            d = dict(zip(cols, r))
+
+            # fecha_clase como string
+            fc = d.get("fecha_clase")
+            d["fecha_clase"] = fc.strftime("%Y-%m-%d") if fc else None
+
+            # normalizar hora_inicio y h_inicio / h_final
+            for key in ("hora_inicio", "h_inicio", "h_final"):
+                val = d.get(key)
+                if val is None:
+                    d[key] = ""
+                elif isinstance(val, str):
+                    d[key] = val[:5]
+                else:
+                    d[key] = val.strftime("%H:%M")
+
+            # renombrar/ajustar claves para que coincidan con el front
+            resultado.append({
+                "institucion": d.get("nombre_inst"),
+                "id_aula": d.get("id_aula"),
+                "grado": d.get("grado"),
+                "numero_semana": d.get("numero_semana"),
+                "fecha_clase": d.get("fecha_clase"),
+                "es_festivo": d.get("es_festivo"),
+                "dia_semana": d.get("dia_semana"),
+                "hora_inicio": d.get("hora_inicio"),
+                "hora_fin": d.get("h_final"),
+                "tutor": None,  # si luego quieres agregarlo, se añade al SELECT
+                "dictada": d.get("dictada"),
+                "horas_dictadas": float(d.get("horas_dictadas") or 0),
+                "horas_no_dictadas": float(d.get("horas_no_dictadas") or 0),
+                "motivo_inasistencia": d.get("motivo_inasistencia"),
+                "reposicion": d.get("reposicion"),
+                "fecha_reposicion": (
+                    d.get("fecha_reposicion").strftime("%Y-%m-%d")
+                    if d.get("fecha_reposicion") else None
+                ),
+            })
+
+        return resultado
+    finally:
+        cur.close()
+        conn.close()

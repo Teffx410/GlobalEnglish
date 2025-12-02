@@ -29,6 +29,9 @@ import AdminVerificarAsistenciaTutor from "./components/Admin/AdminVerificarAsis
 import AdminScoreEstudiante from "./components/Admin/AdminScoreEstudiante";
 import AdminAutogestionTutorReporte from "./components/Admin/AdminAutogestionTutorReporte";
 import AdminFestivos from "./components/Admin/AdminFestivos";
+import ReporteAsistenciaAula from "./components/Admin/ReporteAsistenciaAula";
+import ReporteAsistenciaEstudiante from "./components/Admin/ReporteAsistenciaEstudiante"; // NUEVO
+import BoletinEstudiante from "./components/Admin/BoletinEstudiante"; // NUEVO boletín
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
@@ -38,7 +41,7 @@ function App() {
   const esAdministrativo = rol === "ADMINISTRATIVO";
   const esTutor = rol === "TUTOR";
 
-  const requireAuth = element =>
+  const requireAuth = (element) =>
     token ? element : <Navigate to="/login" replace />;
 
   return (
@@ -75,6 +78,21 @@ function App() {
             <Route
               path="verificar-asistencia-tutor"
               element={<AdminVerificarAsistenciaTutor />}
+            />
+            {/* Reporte de asistencia del aula */}
+            <Route
+              //path="reporte-asistencia-aula"
+              element={<ReporteAsistenciaAula />}
+            />
+            {/* NUEVO: reporte de asistencia del estudiante */}
+            <Route
+              //path="reporte-asistencia-estudiante"
+              element={<ReporteAsistenciaEstudiante />}
+            />
+            {/* NUEVO: boletín de calificaciones del estudiante */}
+            <Route
+              //path="boletin-estudiante"
+              element={<BoletinEstudiante />}
             />
           </>
         )}
@@ -126,6 +144,21 @@ function App() {
         <Route
           path="reporte-autogestion-tutor"
           element={<AdminAutogestionTutorReporte />}
+        />
+        {/* Reporte de asistencia del aula para tutor */}
+        <Route
+          path="reporte-asistencia-aula"
+          element={<ReporteAsistenciaAula />}
+        />
+        {/* NUEVO: reporte de asistencia del estudiante visible al tutor */}
+        <Route
+          path="reporte-asistencia-estudiante"
+          element={<ReporteAsistenciaEstudiante />}
+        />
+        {/* NUEVO: boletín de calificaciones visible al tutor */}
+        <Route
+          path="boletin-estudiante"
+          element={<BoletinEstudiante />}
         />
       </Route>
 

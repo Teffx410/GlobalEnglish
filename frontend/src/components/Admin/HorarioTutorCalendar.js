@@ -48,23 +48,48 @@ const aulaColors = [
   "#D6E4FF",
 ];
 
+// horarios viene con:
+//  - id_aula, grado, dia_semana, h_inicio, h_final, minutos_equiv, es_continuo
+//  - fecha_ini_tutor, fecha_fin_tutor
+//  - fecha_ini_horario, fecha_fin_horario
 function convertirHorarioAEventos(horarios, fechaBase) {
   if (!horarios || horarios.length === 0) return [];
 
-  const baseWeek = startOfWeek(fechaBase, { weekStartsOn: 1 });
+  const semanaInicio = startOfWeek(fechaBase, { weekStartsOn: 1 });
+  const semanaFin = new Date(semanaInicio);
+  semanaFin.setDate(semanaFin.getDate() + 6);
+
+  const rangoSeSolapaConSemana = (iniStr, finStr) => {
+    const ini = iniStr ? new Date(iniStr) : null;
+    const fin = finStr ? new Date(finStr) : null;
+
+    const effIni = ini || new Date("2000-01-01");
+    const effFin = fin || new Date("2100-12-31");
+
+    return effIni <= semanaFin && effFin >= semanaInicio;
+  };
 
   return horarios
     .filter(h => {
-      if (!h.fecha_inicio) return true;
-      const fechaInicio = new Date(h.fecha_inicio);
-      return baseWeek >= startOfWeek(fechaInicio, { weekStartsOn: 1 });
+      const tutorOk = rangoSeSolapaConSemana(
+        h.fecha_ini_tutor,
+        h.fecha_fin_tutor
+      );
+      const horarioOk = rangoSeSolapaConSemana(
+        h.fecha_ini_horario,
+        h.fecha_fin_horario
+      );
+      return tutorOk && horarioOk;
     })
     .map(h => {
+      const baseWeek = semanaInicio;
       const dayNum = diaSemanaToNumber(h.dia_semana);
       const baseDate = new Date(baseWeek);
       baseDate.setDate(baseWeek.getDate() + (dayNum === 0 ? 6 : dayNum - 1));
+
       const [hInit, mInit] = h.h_inicio.split(":").map(Number);
       const [hFin, mFin] = h.h_final.split(":").map(Number);
+
       const start = new Date(baseDate);
       start.setHours(hInit, mInit, 0, 0);
       const end = new Date(baseDate);
@@ -128,8 +153,9 @@ function HorarioTutorCalendar() {
       axios
         .get(`${BASE}/horarios-tutor/${id}`)
         .then(r => {
-          setHorarios(r.data || []);
-          setEventos(convertirHorarioAEventos(r.data || [], new Date()));
+          const data = r.data || [];
+          setHorarios(data);
+          setEventos(convertirHorarioAEventos(data, new Date()));
           setFechaView(new Date());
         })
         .catch(err => {

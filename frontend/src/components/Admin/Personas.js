@@ -10,7 +10,7 @@ function Personas() {
     nombre: "",
     telefono: "",
     correo: "",
-    rol: "TUTOR"
+    rol: "TUTOR",
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -21,7 +21,7 @@ function Personas() {
     nombre: "",
     telefono: "",
     correo: "",
-    rol: "TUTOR"
+    rol: "TUTOR",
   });
 
   const rolActual = localStorage.getItem("rol") || "SIN_ROL";
@@ -33,12 +33,14 @@ function Personas() {
   }, []);
 
   function cargarPersonas() {
+    setError("");
     axios
       .get("http://localhost:8000/personas")
-      .then(r => {
-        // Mostrar solo tutores en la tabla
-        const soloTutores = (r.data || []).filter(p => p.rol === "TUTOR");
-        setPersonas(soloTutores);
+      .then((r) => {
+        const lista = r.data || [];
+        // ADMIN ve a todos, ADMINISTRATIVO solo tutores
+        const visibles = esAdmin ? lista : lista.filter((p) => p.rol === "TUTOR");
+        setPersonas(visibles);
       })
       .catch(() => setError("Error al cargar personas"));
   }
@@ -53,8 +55,14 @@ function Personas() {
       return;
     }
 
-    // ADMINISTRATIVO y ADMIN solo pueden crear tutores desde esta pantalla
-    const payload = { ...form, rol: "TUTOR" };
+    let rolAEnviar = form.rol;
+
+    // El ADMINISTRATIVO solo puede crear tutores
+    if (esAdministrativo) {
+      rolAEnviar = "TUTOR";
+    }
+
+    const payload = { ...form, rol: rolAEnviar };
 
     axios
       .post("http://localhost:8000/personas", payload)
@@ -65,31 +73,31 @@ function Personas() {
           nombre: "",
           telefono: "",
           correo: "",
-          rol: "TUTOR"
+          rol: "TUTOR",
         });
-        setSuccess("Tutor registrado correctamente");
+        setSuccess("Persona registrada correctamente");
         setTimeout(() => setSuccess(""), 3000);
         cargarPersonas();
       })
-      .catch(err => {
+      .catch((err) => {
         const mensaje = err.response?.data?.detail || "No se pudo registrar la persona";
         setError(mensaje);
       });
   }
 
   function eliminarPersona(id_persona) {
-    if (!window.confirm("¿Estás seguro de que deseas eliminar este tutor?")) {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar esta persona?")) {
       return;
     }
 
     axios
       .delete(`http://localhost:8000/personas/${id_persona}`)
       .then(() => {
-        setSuccess("Tutor eliminado correctamente");
+        setSuccess("Persona eliminada correctamente");
         setTimeout(() => setSuccess(""), 3000);
         cargarPersonas();
       })
-      .catch(err => {
+      .catch((err) => {
         const mensaje = err.response?.data?.detail || "Error al eliminar";
         setError(mensaje);
       });
@@ -103,7 +111,7 @@ function Personas() {
       nombre: persona.nombre,
       telefono: persona.telefono,
       correo: persona.correo,
-      rol: "TUTOR" // forzar TUTOR
+      rol: persona.rol,
     });
     setError("");
   }
@@ -123,7 +131,14 @@ function Personas() {
       return;
     }
 
-    const payload = { ...editForm, rol: "TUTOR" };
+    let rolAEnviar = editForm.rol;
+
+    // ADMINISTRATIVO solo puede dejar/poner TUTOR
+    if (esAdministrativo) {
+      rolAEnviar = "TUTOR";
+    }
+
+    const payload = { ...editForm, rol: rolAEnviar };
 
     axios
       .put(`http://localhost:8000/personas/${id_persona}`, payload)
@@ -135,13 +150,13 @@ function Personas() {
           nombre: "",
           telefono: "",
           correo: "",
-          rol: "TUTOR"
+          rol: "TUTOR",
         });
-        setSuccess("Tutor actualizado correctamente");
+        setSuccess("Persona actualizada correctamente");
         setTimeout(() => setSuccess(""), 3000);
         cargarPersonas();
       })
-      .catch(err => {
+      .catch((err) => {
         const mensaje = err.response?.data?.detail || "No se pudo editar la persona";
         setError(mensaje);
       });
@@ -155,12 +170,12 @@ function Personas() {
       nombre: "",
       telefono: "",
       correo: "",
-      rol: "TUTOR"
+      rol: "TUTOR",
     });
     setError("");
   }
 
-  // Solo ADMIN y ADMINISTRATIVO deberían usar esta pantalla
+  // Solo ADMIN y ADMINISTRATIVO pueden entrar
   if (!esAdmin && !esAdministrativo) {
     return (
       <div className="sedes-panel">
@@ -172,12 +187,13 @@ function Personas() {
 
   return (
     <div className="sedes-panel">
-      <h2>Registrar Tutor</h2>
+      <h2>Registrar Persona</h2>
+
       <form className="sedes-form" onSubmit={agregarPersona}>
         <select
           name="tipo_doc"
           value={form.tipo_doc}
-          onChange={e => setForm({ ...form, tipo_doc: e.target.value })}
+          onChange={(e) => setForm({ ...form, tipo_doc: e.target.value })}
           required
         >
           <option value="">Tipo Doc *</option>
@@ -192,7 +208,7 @@ function Personas() {
           name="num_documento"
           placeholder="Número de Documento *"
           value={form.num_documento}
-          onChange={e => setForm({ ...form, num_documento: e.target.value })}
+          onChange={(e) => setForm({ ...form, num_documento: e.target.value })}
           required
         />
 
@@ -201,7 +217,7 @@ function Personas() {
           name="nombre"
           placeholder="Nombre completo *"
           value={form.nombre}
-          onChange={e => setForm({ ...form, nombre: e.target.value })}
+          onChange={(e) => setForm({ ...form, nombre: e.target.value })}
           required
         />
 
@@ -210,7 +226,7 @@ function Personas() {
           name="telefono"
           placeholder="Teléfono"
           value={form.telefono}
-          onChange={e => setForm({ ...form, telefono: e.target.value })}
+          onChange={(e) => setForm({ ...form, telefono: e.target.value })}
         />
 
         <input
@@ -218,20 +234,32 @@ function Personas() {
           name="correo"
           placeholder="Correo *"
           value={form.correo}
-          onChange={e => setForm({ ...form, correo: e.target.value })}
+          onChange={(e) => setForm({ ...form, correo: e.target.value })}
           required
         />
 
-        {/* Rol fijo TUTOR, solo informativo */}
-        <input
-          type="text"
-          value="TUTOR"
-          disabled
-          style={{ background: "#f4f4f4", cursor: "not-allowed" }}
-        />
+        {esAdmin ? (
+          <select
+            name="rol"
+            value={form.rol}
+            onChange={(e) => setForm({ ...form, rol: e.target.value })}
+            required
+          >
+            <option value="TUTOR">TUTOR</option>
+            <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
+            <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+          </select>
+        ) : (
+          <input
+            type="text"
+            value="TUTOR"
+            disabled
+            style={{ background: "#f4f4f4", cursor: "not-allowed" }}
+          />
+        )}
 
         <button type="submit" className="sedes-btn">
-          Registrar Tutor
+          Registrar
         </button>
       </form>
 
@@ -242,7 +270,7 @@ function Personas() {
             padding: "10px",
             background: "#ffefef",
             borderRadius: "4px",
-            marginBottom: "10px"
+            marginBottom: "10px",
           }}
         >
           ❌ {error}
@@ -255,14 +283,17 @@ function Personas() {
             padding: "10px",
             background: "#eaffea",
             borderRadius: "4px",
-            marginBottom: "10px"
+            marginBottom: "10px",
           }}
         >
           ✓ {success}
         </div>
       )}
 
-      <h3 style={{ marginTop: 20, marginBottom: 10 }}>Listado de Tutores</h3>
+      <h3 style={{ marginTop: 20, marginBottom: 10 }}>
+        {esAdmin ? "Listado de Personas" : "Listado de Tutores"}
+      </h3>
+
       <table className="sedes-table">
         <thead>
           <tr>
@@ -277,9 +308,10 @@ function Personas() {
           </tr>
         </thead>
         <tbody>
-          {personas.map(persona => (
+          {personas.map((persona) => (
             <tr key={persona.id_persona}>
               <td>{persona.id_persona}</td>
+
               <td>
                 {editId === persona.id_persona ? (
                   <select
@@ -297,6 +329,7 @@ function Personas() {
                   persona.tipo_doc
                 )}
               </td>
+
               <td>
                 {editId === persona.id_persona ? (
                   <input
@@ -310,6 +343,7 @@ function Personas() {
                   persona.num_documento
                 )}
               </td>
+
               <td>
                 {editId === persona.id_persona ? (
                   <input
@@ -323,6 +357,7 @@ function Personas() {
                   persona.nombre
                 )}
               </td>
+
               <td>
                 {editId === persona.id_persona ? (
                   <input
@@ -336,6 +371,7 @@ function Personas() {
                   persona.telefono
                 )}
               </td>
+
               <td>
                 {editId === persona.id_persona ? (
                   <input
@@ -349,7 +385,27 @@ function Personas() {
                   persona.correo
                 )}
               </td>
-              <td>TUTOR</td>
+
+              <td>
+                {editId === persona.id_persona ? (
+                  esAdmin ? (
+                    <select
+                      name="rol"
+                      value={editForm.rol}
+                      onChange={handleEditChange}
+                    >
+                      <option value="TUTOR">TUTOR</option>
+                      <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
+                      <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+                    </select>
+                  ) : (
+                    "TUTOR"
+                  )
+                ) : (
+                  persona.rol
+                )}
+              </td>
+
               <td>
                 {editId === persona.id_persona ? (
                   <>
@@ -382,10 +438,11 @@ function Personas() {
               </td>
             </tr>
           ))}
+
           {personas.length === 0 && (
             <tr>
               <td colSpan={8} style={{ textAlign: "center", color: "#999" }}>
-                No hay tutores registrados
+                No hay personas registradas
               </td>
             </tr>
           )}

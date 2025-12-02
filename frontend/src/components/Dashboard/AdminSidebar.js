@@ -16,7 +16,6 @@ function AdminSidebar() {
   const esAdministrativo = rol === "ADMINISTRATIVO";
   const esTutor = rol === "TUTOR";
 
-  // Prefijo base según rol: admin o tutor
   const basePath = esTutor ? "/tutor" : "/admin";
 
   function handleLogout() {
@@ -51,7 +50,9 @@ function AdminSidebar() {
           {/* Dashboard visible para todos */}
           <li>
             <Link
-              className={`sidebar-link${isActive(`${basePath}/dashboard`) ? " active" : ""}`}
+              className={`sidebar-link${
+                isActive(`${basePath}/dashboard`) ? " active" : ""
+              }`}
               to={`${basePath}/dashboard`}
             >
               <BsClipboardData size={22} /> Dashboard
@@ -63,7 +64,9 @@ function AdminSidebar() {
             <>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/instituciones`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/instituciones`) ? " active" : ""
+                  }`}
                   to={`${basePath}/instituciones`}
                 >
                   <BsHouse size={22} /> Instituciones
@@ -71,7 +74,9 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/sedes`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/sedes`) ? " active" : ""
+                  }`}
                   to={`${basePath}/sedes`}
                 >
                   <MdLocationCity size={22} /> Sedes
@@ -79,19 +84,20 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/aulas`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/aulas`) ? " active" : ""
+                  }`}
                   to={`${basePath}/aulas`}
                 >
                   <MdSchool size={22} /> Aulas
                 </Link>
               </li>
-              
-              
-              
-              
+
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/horarios`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/horarios`) ? " active" : ""
+                  }`}
                   to={`${basePath}/horarios`}
                 >
                   <MdWatchLater size={22} /> Horarios
@@ -99,7 +105,9 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/asignar-horario`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/asignar-horario`) ? " active" : ""
+                  }`}
                   to={`${basePath}/asignar-horario`}
                 >
                   <MdWatchLater size={22} /> Asignar Horario
@@ -107,7 +115,9 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/asignar-tutor`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/asignar-tutor`) ? " active" : ""
+                  }`}
                   to={`${basePath}/asignar-tutor`}
                 >
                   <MdSchool size={22} /> Asignar Tutor
@@ -115,7 +125,9 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/periodos`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/periodos`) ? " active" : ""
+                  }`}
                   to={`${basePath}/periodos`}
                 >
                   <MdSchool size={22} /> Periodos
@@ -123,7 +135,9 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/componentes`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/componentes`) ? " active" : ""
+                  }`}
                   to={`${basePath}/componentes`}
                 >
                   <MdSchool size={22} /> Componentes
@@ -131,7 +145,9 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/estudiantes`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/estudiantes`) ? " active" : ""
+                  }`}
                   to={`${basePath}/estudiantes`}
                 >
                   <BsPeople size={22} /> Estudiantes
@@ -139,18 +155,21 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/asignar-aula`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/asignar-aula`) ? " active" : ""
+                  }`}
                   to={`${basePath}/asignar-aula`}
                 >
                   <MdSchool size={22} /> Asignar Aula
                 </Link>
               </li>
 
-              {/* Festivos solo para ADMINISTRATIVO */}
               {esAdministrativo && (
                 <li>
                   <Link
-                    className={`sidebar-link${isActive(`${basePath}/festivos`) ? " active" : ""}`}
+                    className={`sidebar-link${
+                      isActive(`${basePath}/festivos`) ? " active" : ""
+                    }`}
                     to={`${basePath}/festivos`}
                   >
                     <BsCalendar size={22} /> Festivos
@@ -160,7 +179,9 @@ function AdminSidebar() {
 
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/motivos-inasistencia`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/motivos-inasistencia`) ? " active" : ""
+                  }`}
                   to={`${basePath}/motivos-inasistencia`}
                 >
                   <FaClipboardCheck size={22} /> Motivos Inasistencia
@@ -168,7 +189,9 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/score-estudiante`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/score-estudiante`) ? " active" : ""
+                  }`}
                   to={`${basePath}/score-estudiante`}
                 >
                   <MdSchool size={22} /> Score Entrada/Salida
@@ -176,7 +199,11 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/verificar-asistencia-tutor`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/verificar-asistencia-tutor`)
+                      ? " active"
+                      : ""
+                  }`}
                   to={`${basePath}/verificar-asistencia-tutor`}
                 >
                   <FaClipboardCheck size={22} /> Verificar Asistencia Tutor
@@ -184,7 +211,9 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/personas`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/personas`) ? " active" : ""
+                  }`}
                   to={`${basePath}/personas`}
                 >
                   <AiOutlineTeam size={22} /> Personas
@@ -198,7 +227,9 @@ function AdminSidebar() {
             <>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/usuarios`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/usuarios`) ? " active" : ""
+                  }`}
                   to={`${basePath}/usuarios`}
                 >
                   <AiOutlineTeam size={22} /> Usuarios
@@ -206,7 +237,9 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/calendario`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/calendario`) ? " active" : ""
+                  }`}
                   to={`${basePath}/calendario`}
                 >
                   <BsCalendar size={22} /> Calendario Semanas
@@ -220,7 +253,9 @@ function AdminSidebar() {
             <>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/ingreso-notas`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/ingreso-notas`) ? " active" : ""
+                  }`}
                   to={`${basePath}/ingreso-notas`}
                 >
                   <MdSchool size={22} /> Ingreso de Notas
@@ -228,7 +263,11 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/toma-asistencia-estudiante`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/toma-asistencia-estudiante`)
+                      ? " active"
+                      : ""
+                  }`}
                   to={`${basePath}/toma-asistencia-estudiante`}
                 >
                   <FaChalkboardTeacher size={22} /> Toma Asistencia Estudiante
@@ -236,15 +275,58 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/asistencia-aula`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/asistencia-aula`) ? " active" : ""
+                  }`}
                   to={`${basePath}/asistencia-aula`}
                 >
                   <FaClipboardCheck size={22} /> Toma de Asistencia Aula
                 </Link>
               </li>
+              {/* Reporte asistencia por aula */}
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/horario-tutor-visual`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/reporte-asistencia-aula`)
+                      ? " active"
+                      : ""
+                  }`}
+                  to={`${basePath}/reporte-asistencia-aula`}
+                >
+                  <BsBarChart size={22} /> Rep. Asistencia Aula
+                </Link>
+              </li>
+              {/* NUEVO: reporte asistencia por estudiante */}
+              <li>
+                <Link
+                  className={`sidebar-link${
+                    isActive(`${basePath}/reporte-asistencia-estudiante`)
+                      ? " active"
+                      : ""
+                  }`}
+                  to={`${basePath}/reporte-asistencia-estudiante`}
+                >
+                  <BsBarChart size={22} /> Rep. Asistencia Estudiante
+                </Link>
+              </li>
+              {/* NUEVO: boletín estudiante */}
+              <li>
+                <Link
+                  className={`sidebar-link${
+                    isActive(`${basePath}/boletin-estudiante`)
+                      ? " active"
+                      : ""
+                  }`}
+                  to={`${basePath}/boletin-estudiante`}
+                >
+                  <BsBarChart size={22} /> Boletín Estudiante
+                </Link>
+              </li>
+              <li>
+                <Link
+                  className={`sidebar-link${
+                    isActive(`${basePath}/horario-tutor-visual`) ? " active" : ""
+                  }`}
                   to={`${basePath}/horario-tutor-visual`}
                 >
                   <MdSchool size={22} /> Horario Tutor
@@ -252,7 +334,11 @@ function AdminSidebar() {
               </li>
               <li>
                 <Link
-                  className={`sidebar-link${isActive(`${basePath}/reporte-autogestion-tutor`) ? " active" : ""}`}
+                  className={`sidebar-link${
+                    isActive(`${basePath}/reporte-autogestion-tutor`)
+                      ? " active"
+                      : ""
+                  }`}
                   to={`${basePath}/reporte-autogestion-tutor`}
                 >
                   <FaClipboardCheck size={22} /> Rep. Autogestión
@@ -261,11 +347,13 @@ function AdminSidebar() {
             </>
           )}
 
-          {/* Reportes generales */}
+          {/* Reportes generales (placeholder) */}
           {(esAdministrativo || esAdmin) && (
             <li>
               <Link
-                className={`sidebar-link${isActive(`${basePath}/reportes`) ? " active" : ""}`}
+                className={`sidebar-link${
+                  isActive(`${basePath}/reportes`) ? " active" : ""
+                }`}
                 to={`${basePath}/reportes`}
               >
                 <BsBarChart size={22} /> Reportes
