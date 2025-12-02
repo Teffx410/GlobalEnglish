@@ -56,6 +56,14 @@ class SedeCreate(BaseModel):
     direccion: str
     es_principal: Literal['S', 'N'] = 'N'
 
+
+# >>>>>>> ESTA ES LA CORRECCIÓN QUE TE FALTABA <<<<<<<<<
+class SedeUpdate(BaseModel):
+    direccion: Optional[str] = None
+    es_principal: Optional[Literal['S', 'N']] = None
+# >>>>>>> FIN DE LA CORRECCIÓN <<<<<<<<<
+
+
 class SedeOut(SedeCreate):
     id_sede: int
 
